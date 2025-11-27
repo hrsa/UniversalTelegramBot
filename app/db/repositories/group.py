@@ -1,0 +1,85 @@
+from sqlalchemy import Sequence
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+
+from app.db.models.group import Group
+
+
+async def get_or_create_group(
+        session: AsyncSession,
+        group_id: int,
+        type: str | None = None,
+        title: str | None = None,
+        status: str | None = None,
+) -> Group:
+    result = await session.execute(
+        select(Group).where(Group.id == group_id)
+    )
+    group = result.scalar_one_or_none()
+
+    if group is None:
+        group = Group(
+            id=group_id,
+            type=type,
+            title=title,
+            status=status
+        )
+        session.add(group)
+        await session.commit()
+    else:
+        if type is not None and type != group.type:
+            group.type = type
+
+        if title is not None and title != group.title:
+            group.title = title
+
+        if status is not None and status != group.status:
+            group.status = status
+
+        await session.commit()
+
+    return group
+
+
+async def set_group_status(session: AsyncSession, group_id: int, status: str) -> Group:
+    group = await get_or_create_group(session, group_id)
+    group.status = status
+    await session.commit()
+    await session.refresh(group)
+    return group
+
+
+async def set_group_features(session: AsyncSession, group_id: int, features: dict) -> Group:
+    group = await get_or_create_group(session, group_id)
+    group.features = features
+    await session.commit()
+    await session.refresh(group)
+    return group
+
+
+async def set_group_greeting(session: AsyncSession, group_id: int, hashtag: str, message: str) -> Group:
+    group = await get_or_create_group(session, group_id)
+
+    group.greeting_hashtag = hashtag
+    group.greeting_message = message
+
+    await session.commit()
+    await session.refresh(group)
+    return group
+
+
+async def get_user_groups(session: AsyncSession, user_id: int) -> Sequence[Group]:
+    result = await session.execute(select(Group).where(Group.members.any(user_id=user_id)))
+    groups = result.scalars().all()
+    return groups
+
+
+async def get_groups_managed_by_user(session: AsyncSession, user_id: int) -> Sequence[Group]:
+    result = await session.execute(select(Group)
+    .where(
+        (Group.members.any(user_id=user_id))
+        &
+        (Group.members.any(is_active_admin=True))
+    ))
+    groups = result.scalars().all()
+    return groups

@@ -32,3 +32,4 @@ ENV/
 .vscode/
 
 docker/acme.json
+/traefik/acme.json

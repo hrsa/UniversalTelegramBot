@@ -1,0 +1,43 @@
+from sqlalchemy import BigInteger, String, TIMESTAMP, func, ForeignKey, and_
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db.session import Base
+
+class GroupMember(Base):
+    __tablename__ = "group_members"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
+
+    group_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("groups.id"), nullable=False)
+
+    role: Mapped[str] = mapped_column(String(50), nullable=True)
+
+    status: Mapped[str] = mapped_column(String(50), nullable=True)
+
+    greeting_message: Mapped[str] = mapped_column(String, nullable=True)
+
+    joined_at: Mapped[str] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=True)
+
+    left_at: Mapped[str] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+
+    user = relationship("User", back_populates="groups")
+    group = relationship("Group", back_populates="members")
+
+    @hybrid_property
+    def is_active_admin(self) -> bool:
+        return self.role == "admin" and self.status == "active"
+
+    @is_active_admin.expression
+    def is_active_admin(cls):
+        return and_(cls.role == "admin", cls.status == "active")
+
+    @hybrid_property
+    def has_greeting(self) -> bool:
+        return self.greeting_message is not None
+
+
+    def __repr__(self):
+        return f"<GroupMember(id={self.id}, user_id={self.user_id}, group_id={self.group_id}, role={self.role}, status={self.status}, joined_at={self.joined_at}, left_at={self.left_at})>"

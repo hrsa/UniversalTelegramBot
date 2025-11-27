@@ -27,6 +27,10 @@ class AdminPanel(StatesGroup):
 
 @router.message(Command("manage"))
 async def start_command(message: Message, state: FSMContext):
+    if message.chat.type != "private":
+        await message.answer("This command is available only in private chats.")
+        return
+
     my_groups = await admin_service.get_my_groups(message.from_user.id)
     if not my_groups:
         await message.answer("You are not an admin in any groups that I am in.")
@@ -74,7 +78,7 @@ async def open_greeting_watch(callback: CallbackQuery, callback_data: AdminCallb
                        AdminCallback.filter(F.action == AdminMenuAction.set_greeting_message))
 async def request_new_greeting_message(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
     await callback.message.edit_text(
-        text="Please enter a new greeting message. Don't forget to include a hashtag like #bio or #greeting")
+        text="Please enter a new greeting message. Don't forget to include a hashtag like #bio or #greeting. Add %USERNAME% if you want to include the username in the message.")
     await state.update_data(group_id=callback_data.group_id)
     await state.update_data(message_id=callback.message.message_id)
     await state.set_state(AdminPanel.setting_greeting_message)
@@ -85,15 +89,18 @@ async def set_new_greeting_message(message: Message, state: FSMContext):
     print('we are in admin interactions')
     group_id = await state.get_value("group_id")
     print(f'group id is:{group_id}')
-    group = await admin_service.set_group_greeting(group_id, message)
+    try:
+        group = await admin_service.set_group_greeting(group_id, message)
+    except ValueError as e:
+        await bot.send_message(message.chat.id, e.args[0])
+        group = await group_service.get_or_create_group(group_id)
     try:
         await bot.delete_message(message.chat.id, await state.get_value("message_id"))
     except Exception as e:
         pass
     keyboard = await build_greeting_watch_keyboard(group_id, group_service)
 
-    message_text = f"Greeting message updated!\n\n" \
-                   f"{group.title} has the following greeting message:\n\n" \
+    message_text = f"{group.title} has the following greeting message:\n\n" \
                    f"{group.greeting_message}"
 
     await bot.send_message(message.chat.id, message_text, reply_markup=keyboard)
@@ -149,7 +156,11 @@ async def go_back(callback: CallbackQuery, callback_data: AdminCallback, state: 
 @router.message(Command('quit'))
 async def quit_admin_interface(message: Message, state: FSMContext):
     await message.answer("Bye!")
+    current_state = await state.get_state()
+    print(f"current state is: {current_state}")
     await state.clear()
+    current_state = await state.get_state()
+    print(f"and now current state is: {current_state}")
 
 
 @router.callback_query(AdminCallback.filter(F.action == AdminMenuAction.quit))

@@ -40,6 +40,7 @@ async def get_or_create_user(
             user.is_bot = is_bot
         await session.commit()
 
+    await session.refresh(user)
     return user
 
 async def get_group_admins(session: AsyncSession, group_id: int) -> Sequence[User]:

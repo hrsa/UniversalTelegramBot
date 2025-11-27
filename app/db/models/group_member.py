@@ -28,11 +28,11 @@ class GroupMember(Base):
 
     @hybrid_property
     def is_active_admin(self) -> bool:
-        return self.role == "admin" and self.status == "active"
+        return self.role == "administrator" and self.status == "active"
 
     @is_active_admin.expression
     def is_active_admin(cls):
-        return and_(cls.role == "admin", cls.status == "active")
+        return and_(cls.role == "administrator", cls.status == "active")
 
     @hybrid_property
     def has_greeting(self) -> bool:

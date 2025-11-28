@@ -5,23 +5,29 @@ from fastapi import FastAPI, Request, HTTPException
 
 from app.config import settings
 from app.bot.core import dp, bot
+from app.events.emitter import redis_broker
 from app.handlers import all_routers
+from app.events.listeners import all_listeners
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     dp.include_routers(*all_routers)
 
-
+    await redis_broker.start()
     await bot.set_webhook(url=f"https://{settings.DOMAIN}/{settings.WEBHOOK_URL}", secret_token=settings.WEBHOOK_SECRET)
     print(
         f"Webhook set to:"
         f"https://{settings.DOMAIN}/{settings.WEBHOOK_URL}"
-          )
+    )
 
     yield
     await bot.delete_webhook()
-app = FastAPI(lifespan=lifespan)
+    await redis_broker.stop()
 
+
+app = FastAPI(lifespan=lifespan, title="aUniversalTelegramBot")
+app.include_router(*all_listeners)
 
 @app.get("/")
 async def root():

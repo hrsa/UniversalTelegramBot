@@ -1,11 +1,8 @@
 from aiogram import Router, F
 from aiogram.filters import StateFilter
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State
 from aiogram.types import Message, ReactionTypeEmoji
 
 from app.bot.core import bot
-from app.config import settings
 from app.db.session import async_session_maker
 from app.handlers.admin_interactions import AdminPanel
 from app.services.admin import AdminService
@@ -18,8 +15,8 @@ router = Router()
 group_service = GroupService(async_session_maker)
 user_service = UserService(async_session_maker)
 group_member_service = GroupMemberService(async_session_maker, group_service, user_service)
-admin_service = AdminService(async_session_maker)
 gp_service = GroupPermissionService(async_session_maker)
+admin_service = AdminService(async_session_maker, gp_service)
 
 
 @router.message(F.left_chat_member)
@@ -72,6 +69,8 @@ async def on_member_join(message: Message):
                                                             status="active", is_bot=message.from_user.is_bot)
 
             my_permissions = await bot.get_chat_member(message.chat.id, bot.id)
+            print('got my permissions:')
+            print(my_permissions)
 
             if my_permissions.status == "member":
                 await gp_service.get_or_create_group_permissions(message.chat.id, role="member")

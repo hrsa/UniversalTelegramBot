@@ -5,12 +5,16 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.db.models.group import Group
 from app.db.repositories import group as group_repo
+from app.events.emitter import emit_event
+from app.events.schemas import GreetingWatchActivatedEvent
 from app.schemas.group_features import GroupFeatures
+from app.services.group_permission import GroupPermissionService
 
 
 class AdminService:
-    def __init__(self, session: async_sessionmaker):
+    def __init__(self, session: async_sessionmaker, group_permission_service: GroupPermissionService):
         self.session = session
+        self.gp_service = group_permission_service
 
     async def get_my_groups(self, user_id) -> Sequence[Group]:
         async with self.session() as session:
@@ -54,10 +58,23 @@ class AdminService:
             group = await group_repo.get_or_create_group(session, group_id)
             current_features = GroupFeatures(**group.features)
             current_value = getattr(current_features, feature_name)
+            if feature_name == "greeting_watch" and current_value == False:
+                await self.check_greeting_watch_permissions(group_id)
             updated_features = current_features.model_copy(update={feature_name: not current_value})
             updated_group = await group_repo.set_group_features(session, group_id, updated_features.model_dump())
 
         return updated_group
+
+    async def check_greeting_watch_permissions(self, group_id: int):
+        if not await self.gp_service.bot_is_admin(group_id):
+            raise PermissionError("greeting_watch", "Please promote me to group administrators first!")
+        if (not await self.gp_service.check_permission(group_id, "can_post_messages")
+            and not (await self.gp_service.check_permission(group_id, "can_manage_chat"))):
+            raise PermissionError("greeting_watch",
+                                  "I need the permission to post messages in order to send greetings!")
+        if not await self.gp_service.check_permission(group_id, "can_restrict_members"):
+            raise PermissionError("greeting_watch",
+                                  "I need the permission to restrict members in order to remove them from the group!")
 
     async def set_group_greeting(self, group_id: int, message: Message) -> Group:
 
@@ -80,7 +97,5 @@ class AdminService:
             hashtag = "#" + hashtag
 
         async with self.session() as session:
-            print(f"message is: {message.text}")
-            print(f"hashtag is: {hashtag}")
             group = await group_repo.set_group_greeting(session, group_id, hashtag, message.text)
             return group

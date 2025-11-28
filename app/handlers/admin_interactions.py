@@ -12,9 +12,11 @@ from app.helpers.admin_interactions import build_main_features_keyboard, build_g
     build_group_selection_keyboard
 from app.services.admin import AdminService
 from app.services.group import GroupService
+from app.services.group_permission import GroupPermissionService
 
 router = Router()
-admin_service = AdminService(async_session_maker)
+group_permission_service = GroupPermissionService(async_session_maker)
+admin_service = AdminService(async_session_maker, group_permission_service)
 group_service = GroupService(async_session_maker)
 
 
@@ -112,19 +114,33 @@ async def toggle_feature(callback: CallbackQuery, callback_data: AdminCallback, 
     feature_name = callback_data.feature_name.name
     group_id = callback_data.group_id
     group = await group_service.get_or_create_group(group_id)
-    await admin_service.toggle_feature(group_id, feature_name)
+    try:
+        await admin_service.toggle_feature(group_id, feature_name)
+    except PermissionError as e:
+        print(e)
+        if e.args[0] == "greeting_watch":
+            await callback.message.edit_text(text=e.args[1])
+            keyboard = await build_greeting_watch_keyboard(group_id, group_service)
+            await callback.message.edit_reply_markup(reply_markup=keyboard)
+        return
 
     await callback.answer(
         f"Feature {feature_name} changed."
     )
-    # await callback_query.answer(f"You have selected group {group_id}.")
 
     if await state.get_state() == AdminPanel.managing_features:
+        message_text = f"{feature_name} was updated successfully!\n\n" \
+                       f"Selected group: {group.title}. What do you want to do with it?"
         keyboard = await build_main_features_keyboard(group_id, group_service)
+        await callback.message.edit_text(text=message_text)
         await callback.message.edit_reply_markup(reply_markup=keyboard)
 
     elif await state.get_state() == AdminPanel.managing_greeting_watch:
+        message_text = f"{feature_name} was updated successfully!\n\n" \
+                       f"{group.title} has the following greeting message:\n\n" \
+                       f"{group.greeting_message}"
         keyboard = await build_greeting_watch_keyboard(group_id, group_service)
+        await callback.message.edit_text(text=message_text)
         await callback.message.edit_reply_markup(reply_markup=keyboard)
 
     else:

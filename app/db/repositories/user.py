@@ -12,7 +12,7 @@ async def get_or_create_user(
         first_name: str | None = None,
         last_name: str | None = None,
         username: str | None = None,
-        is_bot: bool = False,
+        is_bot: bool |None = None,
 ) -> User:
     result = await session.execute(
         select(User).where(User.id == user_id)
@@ -25,20 +25,26 @@ async def get_or_create_user(
             first_name=first_name,
             last_name=last_name,
             username=username,
-            is_bot=is_bot
+            is_bot=is_bot if is_bot is not None else False
         )
         session.add(user)
         await session.commit()
     else:
+        update_needed = False
         if first_name is not None and first_name != user.first_name:
             user.first_name = first_name
+            update_needed = True
         if last_name is not None and last_name != user.last_name:
             user.last_name = last_name
+            update_needed = True
         if username is not None and username != user.username:
             user.username = username
+            update_needed = True
         if is_bot is not None and is_bot != user.is_bot:
             user.is_bot = is_bot
-        await session.commit()
+            update_needed = True
+        if update_needed:
+            await session.commit()
 
     await session.refresh(user)
     return user

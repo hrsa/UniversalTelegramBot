@@ -23,8 +23,8 @@ async def get_or_create_group_member(
         group_member = GroupMember(
             group_id=group_id,
             user_id=user_id,
-            role=role,
-            status=status,
+            role=role if role is not None else "member",
+            status=status if status is not None else "active",
         )
 
         if status == "active":
@@ -35,17 +35,21 @@ async def get_or_create_group_member(
         session.add(group_member)
         await session.commit()
     else:
+        update_needed = False
         if role is not None and role != group_member.role:
             group_member.role = role
-            await session.commit()
+            update_needed = True
         if status is not None and status != group_member.status:
             group_member.status = status
             if status == "active":
                 group_member.joined_at = func.now()
             if status == "left":
                 group_member.left_at = func.now()
+            update_needed = True
+        if update_needed:
             await session.commit()
 
+    await session.refresh(group_member)
     return group_member
 
 

@@ -15,8 +15,8 @@ class GroupMemberService:
         self.user_service = user_service
 
     async def get_or_create_member(self, group_id: int, user_id: int, first_name: str | None = None,
-                                   last_name: str | None = None, username: str | None = None, role: str = "member",
-                                   status: str = "active", is_bot: bool = False):
+                                   last_name: str | None = None, username: str | None = None, role: str | None = None,
+                                   status: str | None = None, is_bot: bool | None = None):
         async with self.session() as session:
             user = await self.user_service.get_or_create_user(user_id=user_id, first_name=first_name,
                                                               last_name=last_name, username=username, is_bot=is_bot)

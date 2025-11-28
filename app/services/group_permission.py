@@ -11,16 +11,16 @@ class GroupPermissionService:
         self.session = session
 
     async def get_or_create_group_permissions(self, group_id: int, role: str | None = None,
-                                              custom_title: str | None = None, can_be_edited: bool = False,
-                                              is_anonymous: bool = False, can_manage_chat: bool = False,
-                                              can_delete_messages: bool = False, can_manage_video_chats: bool = False,
-                                              can_restrict_members: bool = False, can_promote_members: bool = False,
-                                              can_change_info: bool = False, can_invite_users: bool = False,
-                                              can_post_stories: bool = False, can_edit_stories: bool = False,
-                                              can_delete_stories: bool = False, can_post_messages: bool = False,
-                                              can_edit_messages: bool = False, can_pin_messages: bool = False,
-                                              can_manage_topics: bool = False, can_manage_direct_messages: bool = False,
-                                              can_manage_voice_chats: bool = False) -> GroupPermission:
+                                              custom_title: str | None = None, can_be_edited: bool | None = None,
+                                              is_anonymous: bool | None = None, can_manage_chat: bool | None = None,
+                                              can_delete_messages: bool | None = None, can_manage_video_chats: bool | None = None,
+                                              can_restrict_members: bool | None = None, can_promote_members: bool | None = None,
+                                              can_change_info: bool | None = None, can_invite_users: bool | None = None,
+                                              can_post_stories: bool | None = None, can_edit_stories: bool | None = None,
+                                              can_delete_stories: bool | None = None, can_post_messages: bool | None = None,
+                                              can_edit_messages: bool | None = None, can_pin_messages: bool | None = None,
+                                              can_manage_topics: bool | None = None, can_manage_direct_messages: bool | None = None,
+                                              can_manage_voice_chats: bool | None = None) -> GroupPermission:
         async with self.session() as session:
             group_permission = await gp_repo.get_or_create_group_permission(session, group_id=group_id, role=role,
                                                                             custom_title=custom_title,
@@ -50,5 +50,5 @@ class GroupPermissionService:
             return await gp_repo.check_permission(session, group_id, permission)
 
     async def bot_is_admin(self, group_id: int) -> bool:
-        permissions = await get_or_create_group_permission(self.session(), group_id)
+        permissions = await self.get_or_create_group_permissions(group_id=group_id)
         return permissions.role == "administrator"

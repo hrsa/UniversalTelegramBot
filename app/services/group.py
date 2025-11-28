@@ -10,7 +10,7 @@ class GroupService:
         self.session = session
 
     async def get_or_create_group(self, group_id: int, type: str | None = None, title: str | None = None,
-                                  status: str | None = "active") -> Group:
+                                  status: str | None = None) -> Group:
         async with self.session() as session:
             group = await group_repo.get_or_create_group(session, group_id, type, title, status)
 

@@ -22,22 +22,24 @@ async def get_or_create_group(
             id=group_id,
             type=type,
             title=title,
-            status=status
+            status=status if status is not None else "active"
         )
         session.add(group)
         await session.commit()
     else:
+        update_needed = False
         if type is not None and type != group.type:
             group.type = type
-
+            update_needed = True
         if title is not None and title != group.title:
             group.title = title
-
+            update_needed = True
         if status is not None and status != group.status:
             group.status = status
-
-        await session.commit()
-
+            update_needed = True
+        if update_needed:
+            await session.commit()
+    await session.refresh(group)
     return group
 
 

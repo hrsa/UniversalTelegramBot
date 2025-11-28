@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.db.models.group_permission import GroupPermission
 from app.db.repositories import group_permission as gp_repo
+from app.db.repositories.group_permission import get_or_create_group_permission
 from app.schemas.group_features import GroupFeatures
 
 
@@ -47,3 +48,7 @@ class GroupPermissionService:
     async def check_permission(self, group_id: int, permission: str) -> bool:
         async with self.session() as session:
             return await gp_repo.check_permission(session, group_id, permission)
+
+    async def bot_is_admin(self, group_id: int) -> bool:
+        permissions = await get_or_create_group_permission(self.session(), group_id)
+        return permissions.role == "administrator"

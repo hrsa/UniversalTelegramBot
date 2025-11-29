@@ -71,9 +71,11 @@ async def set_member_greeting_message(session: AsyncSession, group_id: int, user
     await session.commit()
     return group_member
 
-async def get_members_without_greetings(session: AsyncSession, group_id: int) -> Sequence[GroupMember]:
-    result = await session.execute(
-        select(GroupMember).where(GroupMember.group_id == group_id).where(GroupMember.greeting_message is None)
-    )
+async def get_members_without_greetings(session: AsyncSession, group_id: int | None = None) -> Sequence[GroupMember]:
+    stmt = select(GroupMember).where(GroupMember.greeting_message is None).where(GroupMember.status == "active")
+    if group_id:
+        stmt = stmt.where(GroupMember.group_id == group_id)
+
+    result = await session.execute(stmt)
     group_members = result.scalars().all()
     return group_members

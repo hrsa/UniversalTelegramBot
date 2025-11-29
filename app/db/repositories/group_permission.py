@@ -1,10 +1,7 @@
-from sqlalchemy import Sequence, Boolean
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from app.db.models.group_member import GroupMember
 from app.db.models.group_permission import GroupPermission
-from app.db.models.user import User
 
 
 async def get_or_create_group_permission(

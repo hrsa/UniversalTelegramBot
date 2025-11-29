@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import BigInteger, String, TIMESTAMP, func, Boolean
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -17,7 +19,7 @@ class User(Base):
 
     last_name: Mapped[str] = mapped_column(String(50), nullable=True)
 
-    created_at: Mapped[str] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
     groups = relationship("GroupMember", back_populates="user", cascade="all, delete-orphan")
 

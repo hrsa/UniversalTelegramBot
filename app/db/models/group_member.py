@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import BigInteger, String, TIMESTAMP, func, ForeignKey, and_
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -19,9 +21,9 @@ class GroupMember(Base):
 
     greeting_message: Mapped[str] = mapped_column(String, nullable=True)
 
-    joined_at: Mapped[str] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=True)
+    joined_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=True)
 
-    left_at: Mapped[str] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    left_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     user = relationship("User", back_populates="groups")
     group = relationship("Group", back_populates="members")

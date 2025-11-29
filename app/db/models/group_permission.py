@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import BigInteger, String, TIMESTAMP, func, ForeignKey, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -51,7 +53,7 @@ class GroupPermission(Base):
 
     can_manage_voice_chats: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    updated_at: Mapped[str] = mapped_column(TIMESTAMP(timezone=True), onupdate=func.now(), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), onupdate=func.now(), nullable=True)
 
     group = relationship("Group", back_populates="permissions")
 

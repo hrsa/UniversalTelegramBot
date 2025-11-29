@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import BigInteger, String, TIMESTAMP, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -21,9 +23,9 @@ class Group(Base):
 
     greeting_message: Mapped[str] = mapped_column(String(360), nullable=True)
 
-    created_at: Mapped[str] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
-    updated_at: Mapped[str] = mapped_column(TIMESTAMP(timezone=True), onupdate=func.now(), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), onupdate=func.now(), nullable=True)
 
     members = relationship("GroupMember", back_populates="group", cascade="all, delete-orphan")
     permissions = relationship("GroupPermission", back_populates="group", cascade="all, delete-orphan")

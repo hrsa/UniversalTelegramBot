@@ -2,6 +2,8 @@ from typing import Sequence
 
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import async_sessionmaker
+
+from app.db.models.group_member import GroupMember
 from app.services.group import GroupService
 from app.services.user import UserService
 from app.db.repositories import group_member as group_member_repo
@@ -56,3 +58,7 @@ class GroupMemberService:
                 await self.group_member_repo.set_member_greeting_message(session, group_id=group.id, user_id=user_id, message=message.text)
                 return True
         return False
+
+    async def get_members_without_greetings(self, group_id: int | None = None) -> Sequence[GroupMember]:
+        async with self.session() as session:
+            return await group_member_repo.get_members_without_greetings(session, group_id)

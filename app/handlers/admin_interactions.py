@@ -2,8 +2,7 @@ from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup, \
-    CallbackQuery
+from aiogram.types import Message, CallbackQuery
 
 from app.bot.core import bot
 from app.db.session import async_session_maker
@@ -117,11 +116,9 @@ async def toggle_feature(callback: CallbackQuery, callback_data: AdminCallback, 
     try:
         await admin_service.toggle_feature(group_id, feature_name)
     except PermissionError as e:
-        print(e)
         if e.args[0] == "greeting_watch":
-            await callback.message.edit_text(text=e.args[1])
             keyboard = await build_greeting_watch_keyboard(group_id, group_service)
-            await callback.message.edit_reply_markup(reply_markup=keyboard)
+            await callback.message.edit_text(text=e.args[1], reply_markup=keyboard)
         return
 
     await callback.answer(
@@ -132,16 +129,14 @@ async def toggle_feature(callback: CallbackQuery, callback_data: AdminCallback, 
         message_text = f"{feature_name} was updated successfully!\n\n" \
                        f"Selected group: {group.title}. What do you want to do with it?"
         keyboard = await build_main_features_keyboard(group_id, group_service)
-        await callback.message.edit_text(text=message_text)
-        await callback.message.edit_reply_markup(reply_markup=keyboard)
+        await callback.message.edit_text(text=message_text, reply_markup=keyboard)
 
     elif await state.get_state() == AdminPanel.managing_greeting_watch:
         message_text = f"{feature_name} was updated successfully!\n\n" \
                        f"{group.title} has the following greeting message:\n\n" \
                        f"{group.greeting_message}"
         keyboard = await build_greeting_watch_keyboard(group_id, group_service)
-        await callback.message.edit_text(text=message_text)
-        await callback.message.edit_reply_markup(reply_markup=keyboard)
+        await callback.message.edit_text(text=message_text, reply_markup=keyboard)
 
     else:
         await callback.message.edit_text(text="Unknown state.")
@@ -163,8 +158,7 @@ async def go_back(callback: CallbackQuery, callback_data: AdminCallback, state: 
 
         keyboard = await build_group_selection_keyboard(my_groups)
 
-        await callback.message.edit_text(welcome_text)
-        await callback.message.edit_reply_markup(reply_markup=keyboard)
+        await callback.message.edit_text(text=welcome_text, reply_markup=keyboard)
     else:
         await callback.message.edit_text(text="Back to main menu.")
 

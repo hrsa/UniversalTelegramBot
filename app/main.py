@@ -8,6 +8,7 @@ from app.bot.core import dp, bot
 from app.events.emitter import redis_broker
 from app.handlers import all_routers
 from app.events.listeners import all_listeners
+from app.scheduler.setup import setup_scheduler, scheduler
 
 
 @asynccontextmanager
@@ -15,6 +16,7 @@ async def lifespan(app: FastAPI):
     dp.include_routers(*all_routers)
 
     await redis_broker.start()
+    setup_scheduler()
     await bot.set_webhook(url=f"https://{settings.DOMAIN}/{settings.WEBHOOK_URL}", secret_token=settings.WEBHOOK_SECRET)
     print(
         f"Webhook set to:"
@@ -24,10 +26,13 @@ async def lifespan(app: FastAPI):
     yield
     await bot.delete_webhook()
     await redis_broker.stop()
+    if scheduler.running:
+        scheduler.shutdown()
 
 
 app = FastAPI(lifespan=lifespan, title="aUniversalTelegramBot")
 app.include_router(*all_listeners)
+
 
 @app.get("/")
 async def root():

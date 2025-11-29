@@ -8,3 +8,7 @@ class BaseEvent(BaseModel):
 
 class GreetingWatchActivatedEvent(BaseEvent):
     group_id: int
+
+class MemberWithNoGreetingEvent(BaseEvent):
+    user_id: int
+    group_id: int

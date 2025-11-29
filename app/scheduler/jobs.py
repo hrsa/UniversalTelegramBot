@@ -4,6 +4,7 @@ from typing import Sequence
 from app.db.models.group_member import GroupMember
 from app.db.session import async_session_maker
 from app.events.emitter import emit_event
+from app.events.schemas import MemberWithNoGreetingEvent
 from app.services.group import GroupService
 from app.services.group_member import GroupMemberService
 from app.services.user import UserService
@@ -17,14 +18,19 @@ group_member_service = GroupMemberService(
 )
 
 
-async def find_members_without_greetings_to_notify():
+async def notify_and_kick_members_without_greetings():
     members: Sequence[GroupMember] = await group_member_service.get_members_without_greetings()
 
     notify_limit = datetime.now(timezone.utc) - timedelta(days=7)
     kick_limit = datetime.now(timezone.utc) - timedelta(days=14)
 
     for member in members:
+        print(member.joined_at, kick_limit, (member.joined_at <= kick_limit), notify_limit, (member.joined_at <= notify_limit))
         if member.joined_at <= kick_limit:
-            await emit_event("member_with_no_greeting.kick", member.user_id)
+            print(f"Kicking member {member.user_id} from group {member.group_id}")
+            await emit_event("member_with_no_greeting.kick", MemberWithNoGreetingEvent(user_id=member.user_id,
+                                                                                       group_id=member.group_id))
         elif member.joined_at <= notify_limit:
-            await emit_event("member_with_no_greeting.notify", member.user_id)
+            print(f"Notifying member {member.user_id} from group {member.group_id}")
+            await emit_event("member_with_no_greeting.notify", MemberWithNoGreetingEvent(user_id=member.user_id,
+                                                                                       group_id=member.group_id))

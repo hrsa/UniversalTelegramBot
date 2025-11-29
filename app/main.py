@@ -31,7 +31,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan, title="aUniversalTelegramBot")
-app.include_router(*all_listeners)
+for listener in all_listeners:
+    app.include_router(listener)
 
 
 @app.get("/")

@@ -69,8 +69,6 @@ async def on_member_join(message: Message):
                                                             status="active", is_bot=message.from_user.is_bot)
 
             my_permissions = await bot.get_chat_member(message.chat.id, bot.id)
-            print('got my permissions:')
-            print(my_permissions)
 
             if my_permissions.status == "member":
                 await gp_service.get_or_create_group_permissions(message.chat.id, role="member")

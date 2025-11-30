@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.sql.functions import func
 
+from app.db.models.group import Group
 from app.db.models.group_member import GroupMember
 
 
@@ -73,7 +74,14 @@ async def set_member_greeting_message(session: AsyncSession, group_id: int, user
     return group_member
 
 async def get_members_without_greetings(session: AsyncSession, group_id: int | None = None) -> Sequence[GroupMember]:
-    stmt = select(GroupMember).where(GroupMember.greeting_message.is_(None)).where(GroupMember.status == "active")
+    stmt = select(GroupMember).join(Group, Group.id == GroupMember.group_id)
+    stmt = stmt.where(GroupMember.greeting_message.is_(None))
+    stmt = stmt.where(GroupMember.status == "active")
+
+    stmt = stmt.where(Group.features.op('->>')('greeting_watch') == 'true')
+    stmt = stmt.where(Group.greeting_message.is_not(None))
+    stmt = stmt.where(Group.greeting_hashtag.is_not(None))
+
     if group_id:
         stmt = stmt.where(GroupMember.group_id == group_id)
 

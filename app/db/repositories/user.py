@@ -52,7 +52,7 @@ async def get_or_create_user(
 async def get_group_admins(session: AsyncSession, group_id: int) -> Sequence[User]:
     result = await session.execute(
         select(User)
-        .join(GroupMember)
+        .join(GroupMember, GroupMember.user_id == User.id)
         .where(
             (GroupMember.group_id == group_id)
             &

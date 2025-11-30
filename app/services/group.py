@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from app.db.models.group import Group
 from app.db.repositories import group as group_repo
 from app.schemas.group_features import GroupFeatures
+from app.schemas.literals import FeatureFlag
 
 
 class GroupService:
@@ -29,7 +30,7 @@ class GroupService:
         group = await self.get_or_create_group(group_id)
         return GroupFeatures(**group.features)
 
-    async def feature_is_active(self, group_id: int, feature_name: str) -> bool:
+    async def feature_is_active(self, group_id: int, feature_name: FeatureFlag) -> bool:
         features = await self.get_features(group_id)
         return getattr(features, feature_name)
 

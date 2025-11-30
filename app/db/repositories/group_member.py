@@ -78,7 +78,8 @@ async def get_members_without_greetings(session: AsyncSession, group_id: int | N
     stmt = stmt.where(GroupMember.greeting_message.is_(None))
     stmt = stmt.where(GroupMember.status == "active")
 
-    stmt = stmt.where(Group.features.op('->>')('greeting_watch') == 'true')
+    stmt = stmt.where(Group.status == "active")
+    stmt = stmt.where(Group.features.contains({"greeting_watch": True}))
     stmt = stmt.where(Group.greeting_message.is_not(None))
     stmt = stmt.where(Group.greeting_hashtag.is_not(None))
 

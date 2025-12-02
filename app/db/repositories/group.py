@@ -69,6 +69,13 @@ async def set_group_greeting(session: AsyncSession, group_id: int, hashtag: str,
     await session.refresh(group)
     return group
 
+async def set_reminder_message(session: AsyncSession, group_id: int, reminder_message: str) -> Group:
+    group = await get_or_create_group(session, group_id)
+    group.reminder_message = reminder_message
+    await session.commit()
+    await session.refresh(group)
+    return group
+
 
 async def get_user_groups(session: AsyncSession, user_id: int) -> Sequence[Group]:
     result = await session.execute(select(Group).where(Group.members.any(user_id=user_id)))

@@ -99,3 +99,10 @@ class AdminService:
         async with self.session() as session:
             group = await group_repo.set_group_greeting(session, group_id, hashtag, message.text)
             return group
+
+    async def set_group_reminder(self, group_id: int, reminder_message: str) -> Group:
+        if not reminder_message:
+            raise ValueError("Reminder message cannot be empty.")
+        async with self.session() as session:
+            group = await group_repo.set_reminder_message(session, group_id, reminder_message)
+            return group

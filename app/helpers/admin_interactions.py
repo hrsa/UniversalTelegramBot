@@ -59,6 +59,12 @@ async def build_greeting_watch_keyboard(group_id: int, group_service: GroupServi
                                                                       group_id=group_id).pack())
                      ])
 
+    keyboard.append([InlineKeyboardButton(text="Set Reminder Message",
+                                          callback_data=AdminCallback(level=2,
+                                                                      action=AdminMenuAction.set_reminder_message,
+                                                                      group_id=group_id).pack())
+                     ])
+
     keyboard.append([InlineKeyboardButton(text="⬅️ Back", callback_data=AdminCallback(level=2, action=AdminMenuAction.back, group_id=group_id).pack())])
 
     return InlineKeyboardMarkup(inline_keyboard=keyboard)

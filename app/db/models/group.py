@@ -23,6 +23,8 @@ class Group(Base):
 
     greeting_message: Mapped[str] = mapped_column(String(360), nullable=True)
 
+    reminder_message: Mapped[str] = mapped_column(String(360), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), onupdate=func.now(), nullable=True)

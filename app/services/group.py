@@ -38,3 +38,8 @@ class GroupService:
         group = await self.get_or_create_group(group_id)
         greeting_message = group.greeting_message
         return greeting_message.replace("%USERNAME%", f"@{username}") if greeting_message else None
+
+    async def get_reminder_message(self, group_id: int, username: str) -> str | None:
+        group = await self.get_or_create_group(group_id)
+        reminder_message = group.reminder_message
+        return reminder_message.replace("%USERNAME%", f"@{username}") if reminder_message else None

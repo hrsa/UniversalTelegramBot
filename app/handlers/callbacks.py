@@ -8,6 +8,7 @@ class AdminMenuAction(str, Enum):
     toggle_bool = 'tb'
     set_value = 'sv'
     set_greeting_message = 'sgm'
+    set_reminder_message = 'srm'
     back = 'b'
     quit = 'q'
 

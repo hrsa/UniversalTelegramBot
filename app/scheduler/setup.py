@@ -13,5 +13,10 @@ def setup_scheduler():
         CronTrigger(hour=19, minute=00, timezone=timezone.utc)
     )
 
+    scheduler.add_job(
+        jobs.get_group_admins,
+        CronTrigger(hour=1, minute=00, timezone=timezone.utc)
+    )
+
     scheduler.start()
     return scheduler

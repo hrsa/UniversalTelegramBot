@@ -4,7 +4,7 @@ from typing import Sequence
 from app.db.models.group_member import GroupMember
 from app.db.session import async_session_maker
 from app.events.emitter import emit_event
-from app.events.schemas import MemberWithNoGreetingEvent
+from app.events.schemas import MemberWithNoGreetingEvent, GetGroupAdminsEvent
 from app.services.group import GroupService
 from app.services.group_member import GroupMemberService
 from app.services.user import UserService
@@ -34,3 +34,9 @@ async def notify_and_kick_members_without_greetings():
             print(f"Notifying member {member.user_id} from group {member.group_id}")
             await emit_event("member_with_no_greeting.notify", MemberWithNoGreetingEvent(user_id=member.user_id,
                                                                                        group_id=member.group_id))
+
+async def get_group_admins():
+    groups = await group_service.get_active_groups()
+
+    for group in groups:
+        await emit_event("get_group_admins", GetGroupAdminsEvent(group_id=group.id))

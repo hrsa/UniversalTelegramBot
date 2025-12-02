@@ -42,6 +42,11 @@ async def get_or_create_group(
     await session.refresh(group)
     return group
 
+async def get_active_groups(session: AsyncSession) -> Sequence[Group]:
+    result = await session.execute(select(Group).where(Group.status == "active"))
+    groups = result.scalars().all()
+    return groups
+
 
 async def set_group_status(session: AsyncSession, group_id: int, status: str) -> Group:
     group = await get_or_create_group(session, group_id)

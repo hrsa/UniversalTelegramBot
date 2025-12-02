@@ -1,3 +1,5 @@
+from typing import Sequence
+
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.db.models.group import Group
@@ -16,6 +18,10 @@ class GroupService:
             group = await group_repo.get_or_create_group(session, group_id, type, title, status)
 
         return group
+
+    async def get_active_groups(self) -> Sequence[Group]:
+        async with self.session() as session:
+            return await group_repo.get_active_groups(session)
 
     async def leave_group(self, group_id: int) -> Group:
         async with self.session() as session:

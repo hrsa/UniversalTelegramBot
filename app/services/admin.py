@@ -5,8 +5,6 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.db.models.group import Group
 from app.db.repositories import group as group_repo
-from app.events.emitter import emit_event
-from app.events.schemas import GreetingWatchActivatedEvent
 from app.schemas.group_features import GroupFeatures
 from app.services.group_permission import GroupPermissionService
 

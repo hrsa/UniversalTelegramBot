@@ -57,6 +57,8 @@ async def get_group_admins(session: AsyncSession, group_id: int) -> Sequence[Use
             (GroupMember.group_id == group_id)
             &
             (GroupMember.is_active_admin == True)
+            &
+            (User.is_bot == False)
         )
     )
     return result.scalars().all()

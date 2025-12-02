@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, String, TIMESTAMP, func, ForeignKey, and_
+from sqlalchemy import BigInteger, String, TIMESTAMP, func, ForeignKey, and_, or_
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -30,11 +30,11 @@ class GroupMember(Base):
 
     @hybrid_property
     def is_active_admin(self) -> bool:
-        return self.role == "administrator" and self.status == "active"
+        return (self.role == "administrator" or self.role == "creator") and self.status == "active"
 
     @is_active_admin.expression
     def is_active_admin(cls):
-        return and_(cls.role == "administrator", cls.status == "active")
+        return and_(or_(cls.role == "administrator", cls.role == "creator"), cls.status == "active")
 
     @hybrid_property
     def has_greeting(self) -> bool:

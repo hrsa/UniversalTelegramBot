@@ -9,3 +9,4 @@ asyncpg
 redis
 alembic
 pydantic-settings
+loguru

@@ -1,6 +1,7 @@
 from aiogram import Router, F
 from aiogram.filters import StateFilter
 from aiogram.types import Message, ReactionTypeEmoji
+from loguru import logger
 
 from app.bot.core import bot
 from app.db.session import async_session_maker
@@ -38,21 +39,14 @@ async def on_member_leave(message: Message):
         print(e)
 
     if await group_service.feature_is_active(message.chat.id, "report_leaving_members"):
-        admins = await user_service.get_group_admins(message.chat.id)
-        for admin in admins:
-            try:
-                if not admin.is_bot:
-                    await bot.send_message(admin.id, f"User @{message.left_chat_member.username} left '{message.chat.title}'")
-            except Exception as e:
-                print(e)
-                pass
+        await user_service.notify_admins(f"User @{message.left_chat_member.username} left '{message.chat.title}'", message.chat.id)
 
 
 @router.message(F.new_chat_members)
 async def on_member_join(message: Message):
-    print(message.model_dump_json(indent=4, exclude_none=True))
+    logger.info(message.model_dump_json(indent=4, exclude_none=True))
 
-    print(
+    logger.info(
         f"User {message.from_user.id} joined chat {message.chat.id} "
     )
 
@@ -89,7 +83,8 @@ async def on_member_join(message: Message):
 
         await group_member_service.get_or_create_member(group_id=message.chat.id, user_id=member.id,
                                                         first_name=member.first_name,
-                                                        last_name=member.last_name, username=member.username, is_bot=member.is_bot)
+                                                        last_name=member.last_name, username=member.username,
+                                                        is_bot=member.is_bot, status="active", role="member")
 
         if await group_service.feature_is_active(message.chat.id, "greeting_watch"):
             greeting_message = await group_service.get_greeting_message(message.chat.id, member.username)
@@ -97,15 +92,7 @@ async def on_member_join(message: Message):
                 await bot.send_message(message.chat.id, greeting_message)
 
         if await group_service.feature_is_active(message.chat.id, "report_new_members"):
-            admins = await user_service.get_group_admins(message.chat.id)
-            for admin in admins:
-                try:
-                    if not admin.is_bot:
-                        await bot.send_message(admin.id,
-                                               f"User @{member.username} joined '{message.chat.title}'")
-                except Exception as e:
-                    print(e)
-                    pass
+            await user_service.notify_admins(f"User @{member.username} joined '{message.chat.title}'", message.chat.id)
 
 
 @router.message(F.text.contains("#"), ~StateFilter(AdminPanel))
@@ -151,5 +138,3 @@ async def on_member_status_change(message: Message):
                                                                  can_manage_voice_chats=member.can_manage_voice_chats)
         else:
             await gp_service.get_or_create_group_permissions(message.chat.id, role=member.status)
-
-# TODO: add method for periodically checking group administrators list

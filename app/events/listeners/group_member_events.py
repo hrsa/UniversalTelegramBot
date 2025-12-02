@@ -30,6 +30,11 @@ async def on_kick_member_with_no_greeting(event: MemberWithNoGreetingEvent):
 
     user = await user_service.get_or_create_user(event.user_id)
     group = await group_service.get_or_create_group(event.group_id)
+    member = await group_member_service.get_or_create_member(event.group_id, event.user_id)
+
+    if member.is_active_admin:
+        logger.info(f"Tried to kick active admin {event.user_id}, but it's not possible.")
+        return
 
     if not can_kick_members:
         await user_service.notify_admins(

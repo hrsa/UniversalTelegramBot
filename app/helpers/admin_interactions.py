@@ -1,10 +1,24 @@
 from typing import Sequence
 
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, MaybeInaccessibleMessageUnion
+from loguru import logger
 
 from app.db.models.group import Group
 from app.handlers.callbacks import AdminCallback, AdminMenuAction, GroupFeature
 from app.services.group import GroupService
+
+
+async def edit_message_safely(message: MaybeInaccessibleMessageUnion, text: str, reply_markup: InlineKeyboardMarkup | None = None):
+    try:
+        return await message.edit_text(text=text, reply_markup=reply_markup, parse_mode="HTML")
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e):
+            logger.warning(e)
+            pass
+        else:
+            logger.error(e)
+            raise
 
 
 async def build_group_selection_keyboard(groups: Sequence[Group]) -> InlineKeyboardMarkup:

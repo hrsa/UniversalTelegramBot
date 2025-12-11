@@ -9,7 +9,7 @@ from app.bot.core import bot
 from app.db.session import async_session_maker
 from app.handlers.callbacks import AdminCallback, AdminMenuAction, GroupFeature
 from app.helpers.admin_interactions import build_main_features_keyboard, build_greeting_watch_keyboard, \
-    build_group_selection_keyboard
+    build_group_selection_keyboard, edit_message_safely
 from app.services.admin import AdminService
 from app.services.group import GroupService
 from app.services.group_permission import GroupPermissionService
@@ -43,7 +43,6 @@ async def start_command(message: Message, state: FSMContext):
         f"Hello, my dear tester {message.from_user.full_name}!\n\n"
         f"Please select a group from the list below:"
     )
-    # await state.update_data(message_id=message.message_id, selected_group_id=None)
 
     keyboard = await build_group_selection_keyboard(my_groups)
 
@@ -59,8 +58,9 @@ async def process_group_selection(callback: CallbackQuery, callback_data: AdminC
 
     keyboard = await build_main_features_keyboard(group_id, group_service)
 
-    await callback.message.edit_text(text=f"Selected group: {group.title}. What do you want to do with it?",
-                                     reply_markup=keyboard)
+    await edit_message_safely(message=callback.message,
+                              text=f"Selected group: {group.title}. What do you want to do with it?",
+                              reply_markup=keyboard)
     await state.set_state(AdminPanel.managing_features)
 
 
@@ -70,18 +70,21 @@ async def open_greeting_watch(callback: CallbackQuery, callback_data: AdminCallb
     group = await group_service.get_or_create_group(callback_data.group_id)
     keyboard = await build_greeting_watch_keyboard(group.id, group_service)
 
-    message_text = f"{group.title} has the following greeting message:\n\n" \
-                   f"{group.greeting_message}"
+    message_text = f"{group.title} has the following:\n\n" \
+                   "Greeting message:\n" \
+                   f"{group.greeting_message} \n\n" \
+                   f"Reminder message:\n" \
+                   f"{group.reminder_message}"
 
-    await callback.message.edit_text(text=message_text, reply_markup=keyboard)
+    await edit_message_safely(message=callback.message, text=message_text, reply_markup=keyboard)
     await state.set_state(AdminPanel.managing_greeting_watch)
 
 
 @router.callback_query(AdminPanel.managing_greeting_watch,
                        AdminCallback.filter(F.action == AdminMenuAction.set_greeting_message))
 async def request_new_greeting_message(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
-    await callback.message.edit_text(
-        text="Please enter a new greeting message. Don't forget to include a hashtag like #bio or #greeting. Add %USERNAME% if you want to include the username in the message.")
+    await edit_message_safely(message=callback.message,
+                              text="Please enter a new greeting message. Don't forget to include a hashtag like #bio or #greeting. Add %USERNAME% if you want to include the username in the message.")
     await state.update_data(group_id=callback_data.group_id)
     await state.update_data(message_id=callback.message.message_id)
     await state.set_state(AdminPanel.setting_greeting_message)
@@ -109,14 +112,16 @@ async def set_new_greeting_message(message: Message, state: FSMContext):
     await bot.send_message(message.chat.id, message_text, reply_markup=keyboard)
     await state.set_state(AdminPanel.managing_greeting_watch)
 
+
 @router.callback_query(AdminPanel.managing_greeting_watch,
                        AdminCallback.filter(F.action == AdminMenuAction.set_reminder_message))
 async def request_new_reminder_message(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
-    await callback.message.edit_text(
-        text="Please enter a new reminder message that will be followed by the repeated greeting. Add %USERNAME% if you want to include the username in the message.")
+    await edit_message_safely(message=callback.message,
+                              text="Please enter a new reminder message that will be followed by the repeated greeting. Add %USERNAME% if you want to include the username in the message.")
     await state.update_data(group_id=callback_data.group_id)
     await state.update_data(message_id=callback.message.message_id)
     await state.set_state(AdminPanel.setting_reminder_message)
+
 
 @router.message(AdminPanel.setting_reminder_message)
 async def set_new_greeting_message(message: Message, state: FSMContext):
@@ -134,7 +139,10 @@ async def set_new_greeting_message(message: Message, state: FSMContext):
         logger.error(e)
     keyboard = await build_greeting_watch_keyboard(group_id, group_service)
 
-    message_text = f"{group.title} has the following reminder message:\n\n" \
+    message_text = f"{group.title} has the following:\n\n" \
+                   "Greeting message:\n" \
+                   f"{group.greeting_message} \n\n" \
+                   f"Reminder message:\n" \
                    f"{group.reminder_message}"
 
     await bot.send_message(message.chat.id, message_text, reply_markup=keyboard)
@@ -151,7 +159,7 @@ async def toggle_feature(callback: CallbackQuery, callback_data: AdminCallback, 
     except PermissionError as e:
         if e.args[0] == "greeting_watch":
             keyboard = await build_greeting_watch_keyboard(group_id, group_service)
-            await callback.message.edit_text(text=e.args[1], reply_markup=keyboard)
+            await edit_message_safely(message=callback.message, text=e.args[1], reply_markup=keyboard)
         return
 
     await callback.answer(
@@ -162,17 +170,17 @@ async def toggle_feature(callback: CallbackQuery, callback_data: AdminCallback, 
         message_text = f"{feature_name} was updated successfully!\n\n" \
                        f"Selected group: {group.title}. What do you want to do with it?"
         keyboard = await build_main_features_keyboard(group_id, group_service)
-        await callback.message.edit_text(text=message_text, reply_markup=keyboard)
+        await edit_message_safely(message=callback.message, text=message_text, reply_markup=keyboard)
 
     elif await state.get_state() == AdminPanel.managing_greeting_watch:
         message_text = f"{feature_name} was updated successfully!\n\n" \
                        f"{group.title} has the following greeting message:\n\n" \
                        f"{group.greeting_message}"
         keyboard = await build_greeting_watch_keyboard(group_id, group_service)
-        await callback.message.edit_text(text=message_text, reply_markup=keyboard)
+        await edit_message_safely(message=callback.message, text=message_text, reply_markup=keyboard)
 
     else:
-        await callback.message.edit_text(text="Unknown state.")
+        await edit_message_safely(message=callback.message, text="Unknown state.")
 
 
 @router.callback_query(AdminCallback.filter(F.action == AdminMenuAction.back))
@@ -191,19 +199,15 @@ async def go_back(callback: CallbackQuery, callback_data: AdminCallback, state: 
 
         keyboard = await build_group_selection_keyboard(my_groups)
 
-        await callback.message.edit_text(text=welcome_text, reply_markup=keyboard)
+        await edit_message_safely(message=callback.message, text=welcome_text, reply_markup=keyboard)
     else:
-        await callback.message.edit_text(text="Back to main menu.")
+        await edit_message_safely(message=callback.message, text="Back to main menu.")
 
 
 @router.message(Command('quit'))
 async def quit_admin_interface(message: Message, state: FSMContext):
     await message.answer("Bye!")
-    current_state = await state.get_state()
-    print(f"current state is: {current_state}")
     await state.clear()
-    current_state = await state.get_state()
-    print(f"and now current state is: {current_state}")
 
 
 @router.callback_query(AdminCallback.filter(F.action == AdminMenuAction.quit))

@@ -124,7 +124,7 @@ async def request_new_reminder_message(callback: CallbackQuery, callback_data: A
 
 
 @router.message(AdminPanel.setting_reminder_message)
-async def set_new_greeting_message(message: Message, state: FSMContext):
+async def set_new_reminder_message(message: Message, state: FSMContext):
     group_id = await state.get_value("group_id")
     message_id = await state.get_value("message_id")
     try:

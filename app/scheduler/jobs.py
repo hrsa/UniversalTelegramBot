@@ -1,6 +1,8 @@
 from datetime import timedelta, datetime, timezone
 from typing import Sequence
 
+from loguru import logger
+
 from app.db.models.group_member import GroupMember
 from app.db.session import async_session_maker
 from app.events.emitter import emit_event
@@ -25,13 +27,12 @@ async def notify_and_kick_members_without_greetings():
     kick_limit = datetime.now(timezone.utc) - timedelta(days=14)
 
     for member in members:
-        print(member.joined_at, kick_limit, (member.joined_at <= kick_limit), notify_limit, (member.joined_at <= notify_limit))
-        if member.joined_at <= kick_limit:
-            print(f"Kicking member {member.user_id} from group {member.group_id}")
+        if member.joined_at <= kick_limit or group_member_service.has_too_many_warnings(member.group_id, member.user_id):
+            logger.info(f"Kicking member {member.user_id} from group {member.group_id}")
             await emit_event("member_with_no_greeting.kick", MemberWithNoGreetingEvent(user_id=member.user_id,
                                                                                        group_id=member.group_id))
         elif member.joined_at <= notify_limit:
-            print(f"Notifying member {member.user_id} from group {member.group_id}")
+            logger.info(f"Notifying member {member.user_id} from group {member.group_id}. They have {member.warning_count} warnings.")
             await emit_event("member_with_no_greeting.notify", MemberWithNoGreetingEvent(user_id=member.user_id,
                                                                                        group_id=member.group_id))
 

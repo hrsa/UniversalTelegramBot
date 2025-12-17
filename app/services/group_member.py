@@ -62,3 +62,22 @@ class GroupMemberService:
     async def get_members_without_greetings(self, group_id: int | None = None) -> Sequence[GroupMember]:
         async with self.session() as session:
             return await group_member_repo.get_members_without_greetings(session, group_id)
+
+
+    async def increase_warning_count(self, group_id: int, user_id: int) -> GroupMember:
+        async with self.session() as session:
+            return await group_member_repo.increase_warning_count(session, group_id, user_id)
+
+    async def reset_warning_count(self, group_id: int, user_id: int) -> GroupMember:
+        async with self.session() as session:
+            group_member = await group_member_repo.get_or_create_group_member(session, group_id, user_id)
+            group_member.warning_count = 0
+            await session.commit()
+            await session.refresh(group_member)
+            return group_member
+
+    async def has_too_many_warnings(self, group_id: int, user_id: int) -> bool:
+        async with self.session() as session:
+            group_member = await group_member_repo.get_or_create_group_member(session, group_id, user_id)
+            group_features = await self.group_service.get_features(group_id)
+            return group_member.warning_count >= group_features.max_warning_count

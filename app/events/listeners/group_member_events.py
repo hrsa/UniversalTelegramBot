@@ -46,6 +46,7 @@ async def on_kick_member_with_no_greeting(event: MemberWithNoGreetingEvent):
 
     await user_service.kick_user(event.group_id, event.user_id)
     await user_service.notify_admins(f"I've kicked @{user.username} from {group.title}.", event.group_id)
+    await group_member_service.reset_warning_count(group_id=event.group_id, user_id=event.user_id)
 
 
 @broker.subscriber("events.member_with_no_greeting.notify")
@@ -58,3 +59,5 @@ async def on_notify_member_with_no_greeting(event: MemberWithNoGreetingEvent):
         user_id=event.user_id,
         group_id=event.group_id,
         message=f"{reminder_message}\n\n{greeting_message}")
+
+    await group_member_service.increase_warning_count(group_id=event.group_id, user_id=event.user_id)

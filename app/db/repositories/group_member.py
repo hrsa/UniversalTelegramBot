@@ -82,6 +82,7 @@ async def get_members_without_greetings(session: AsyncSession, group_id: int | N
     stmt = stmt.where(Group.features.contains({"greeting_watch": True}))
     stmt = stmt.where(Group.greeting_message.is_not(None))
     stmt = stmt.where(Group.greeting_hashtag.is_not(None))
+    stmt = stmt.where(Group.reminder_message.is_not(None))
 
     if group_id:
         stmt = stmt.where(GroupMember.group_id == group_id)
@@ -89,3 +90,10 @@ async def get_members_without_greetings(session: AsyncSession, group_id: int | N
     result = await session.execute(stmt)
     group_members = result.scalars().all()
     return group_members
+
+async def increase_warning_count(session: AsyncSession, group_id: int, user_id: int) -> GroupMember:
+    group_member = await get_or_create_group_member(session, group_id, user_id)
+    group_member.warning_count += 1
+    await session.commit()
+    await session.refresh(group_member)
+    return group_member

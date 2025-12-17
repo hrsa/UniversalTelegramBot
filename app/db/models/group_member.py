@@ -21,6 +21,8 @@ class GroupMember(Base):
 
     greeting_message: Mapped[str] = mapped_column(String, nullable=True)
 
+    warning_count: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+
     joined_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=True)
 
     left_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
@@ -33,8 +35,8 @@ class GroupMember(Base):
         return (self.role == "administrator" or self.role == "creator") and self.status == "active"
 
     @is_active_admin.expression
-    def is_active_admin(cls):
-        return and_(or_(cls.role == "administrator", cls.role == "creator"), cls.status == "active")
+    def is_active_admin(self):
+        return and_(or_(self.role == "administrator", self.role == "creator"), self.status == "active")
 
     @hybrid_property
     def has_greeting(self) -> bool:

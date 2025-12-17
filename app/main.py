@@ -19,7 +19,12 @@ async def lifespan(app: FastAPI):
 
     await redis_broker.start()
     setup_scheduler()
-    await bot.set_webhook(url=f"https://{settings.DOMAIN}/{settings.WEBHOOK_URL}", secret_token=settings.WEBHOOK_SECRET)
+    await bot.set_webhook(url=f"https://{settings.DOMAIN}/{settings.WEBHOOK_URL}", secret_token=settings.WEBHOOK_SECRET,
+                          allowed_updates=["message", "edited_message", "channel_post", "edited_channel_post", "business_connection",
+                                           "business_message", "edited_business_message", "deleted_business_message", "message_reaction",
+                                           "message_reaction_count", "inline_query", "chosen_inline_result", "callback_query",
+                                           "shipping_query", "pre_checkout_query", "purchased_paid_media", "poll", "poll_answer",
+                                           "my_chat_member", "chat_member", "chat_join_request", "chat_boost", "removed_chat_boost"])
     print(
         f"Webhook set to:"
         f"https://{settings.DOMAIN}/{settings.WEBHOOK_URL}"
@@ -55,7 +60,7 @@ async def handle_update(request: Request):
     update_data = await request.json()
     update = Update(**update_data)
     await dp.feed_update(update=update, bot=bot)
-    print(update.model_dump_json(indent=4, exclude_none=True))
+    logger.info(update.model_dump_json(indent=4, exclude_none=True))
     return {"status": "OK"}
 
 

@@ -9,7 +9,7 @@ from app.bot.core import bot
 from app.db.session import async_session_maker
 from app.handlers.callbacks import AdminCallback, AdminMenuAction, GroupFeature
 from app.helpers.admin_interactions import build_main_features_keyboard, build_greeting_watch_keyboard, \
-    build_group_selection_keyboard, edit_message_safely
+    build_group_selection_keyboard, edit_message_safely, build_greeting_watch_text
 from app.services.admin import AdminService
 from app.services.group import GroupService
 from app.services.group_permission import GroupPermissionService
@@ -70,11 +70,7 @@ async def open_greeting_watch(callback: CallbackQuery, callback_data: AdminCallb
     group = await group_service.get_or_create_group(callback_data.group_id)
     keyboard = await build_greeting_watch_keyboard(group.id, group_service)
 
-    message_text = f"{group.title} has the following:\n\n" \
-                   "Greeting message:\n" \
-                   f"{group.greeting_message} \n\n" \
-                   f"Reminder message:\n" \
-                   f"{group.reminder_message}"
+    message_text = await build_greeting_watch_text(group.id, callback.from_user.username, group_service)
 
     await edit_message_safely(message=callback.message, text=message_text, reply_markup=keyboard)
     await state.set_state(AdminPanel.managing_greeting_watch)
@@ -106,8 +102,7 @@ async def set_new_greeting_message(message: Message, state: FSMContext):
         logger.error(e)
     keyboard = await build_greeting_watch_keyboard(group_id, group_service)
 
-    message_text = f"{group.title} has the following greeting message:\n\n" \
-                   f"{group.greeting_message}"
+    message_text = await build_greeting_watch_text(group_id, message.from_user.username, group_service)
 
     await bot.send_message(message.chat.id, message_text, reply_markup=keyboard)
     await state.set_state(AdminPanel.managing_greeting_watch)
@@ -139,11 +134,7 @@ async def set_new_reminder_message(message: Message, state: FSMContext):
         logger.error(e)
     keyboard = await build_greeting_watch_keyboard(group_id, group_service)
 
-    message_text = f"{group.title} has the following:\n\n" \
-                   "Greeting message:\n" \
-                   f"{group.greeting_message} \n\n" \
-                   f"Reminder message:\n" \
-                   f"{group.reminder_message}"
+    message_text = await build_greeting_watch_text(group_id, message.from_user.username, group_service)
 
     await bot.send_message(message.chat.id, message_text, reply_markup=keyboard)
     await state.set_state(AdminPanel.managing_greeting_watch)

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.db.models.group import Group
 from app.db.repositories import group as group_repo
-from app.schemas.group_features import GroupFeatures
+from app.schemas.group_features import GroupFeatures, ChannelFeatures
 from app.services.group_permission import GroupPermissionService
 
 
@@ -39,7 +39,7 @@ class AdminService:
 
         async with self.session() as session:
             group = await group_repo.get_or_create_group(session, group_id)
-            current_features = GroupFeatures(**group.features)
+            current_features = GroupFeatures(**group.features) if group.type == "supergroup" else ChannelFeatures(**group.features)
             updated_features = current_features.model_copy(update={feature_name: coerced_value})
             updated_group = await group_repo.set_group_features(session, group_id, updated_features.model_dump())
 
@@ -54,7 +54,7 @@ class AdminService:
 
         async with self.session() as session:
             group = await group_repo.get_or_create_group(session, group_id)
-            current_features = GroupFeatures(**group.features)
+            current_features = GroupFeatures(**group.features) if group.type == "supergroup" else ChannelFeatures(**group.features)
             current_value = getattr(current_features, feature_name)
             if feature_name == "greeting_watch" and current_value == False:
                 await self.check_greeting_watch_permissions(group_id)

@@ -1,23 +1,30 @@
+from typing import Sequence
+
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from loguru import logger
 
 from app.bot.core import bot
+from app.db.models.message import Message
 from app.db.session import async_session_maker
 from app.handlers.callbacks import AdminCallback, AdminMenuAction, GroupFeature
 from app.helpers.admin_interactions import build_main_features_keyboard, build_greeting_watch_keyboard, \
-    build_group_selection_keyboard, edit_message_safely, build_greeting_watch_text
+    build_group_selection_keyboard, edit_message_safely, build_greeting_watch_text, build_confirm_announcement_keyboard, \
+    build_confirm_pin_keyboard, build_announcement_mgmt_message, build_announcement_delete_confirmation
 from app.services.admin import AdminService
 from app.services.group import GroupService
 from app.services.group_permission import GroupPermissionService
+from app.services.message import MessageService
 
 router = Router()
 group_permission_service = GroupPermissionService(async_session_maker)
 admin_service = AdminService(async_session_maker, group_permission_service)
 group_service = GroupService(async_session_maker)
+message_service = MessageService(async_session_maker)
 
 
 class AdminPanel(StatesGroup):
@@ -26,6 +33,11 @@ class AdminPanel(StatesGroup):
     managing_greeting_watch = State()
     setting_greeting_message = State()
     setting_reminder_message = State()
+    creating_announcement = State()
+    confirming_announcement = State()
+    confirming_pin = State()
+    managing_announcements = State()
+    confirming_delete_announcement = State()
 
 
 @router.message(Command("manage"))
@@ -74,6 +86,119 @@ async def open_greeting_watch(callback: CallbackQuery, callback_data: AdminCallb
 
     await edit_message_safely(message=callback.message, text=message_text, reply_markup=keyboard)
     await state.set_state(AdminPanel.managing_greeting_watch)
+
+
+@router.callback_query(AdminPanel.managing_features,
+                       AdminCallback.filter(F.action == AdminMenuAction.make_announcement))
+async def make_announcement(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
+    group = await group_service.get_or_create_group(callback_data.group_id)
+    await state.update_data(group_id=callback_data.group_id)
+    await state.update_data(message_id=callback.message.message_id)
+    await edit_message_safely(message=callback.message,
+                              text=f"Please enter the announcement message for {group.title}.")
+    await state.set_state(AdminPanel.creating_announcement)
+
+
+@router.message(AdminPanel.creating_announcement)
+async def show_confirmation_dialogue(message: Message, state: FSMContext):
+    group_id = await state.get_value("group_id")
+    message_id = await state.get_value("message_id")
+    await state.update_data(announcement_text=message.text)
+    try:
+        await bot.delete_message(message.chat.id, message.message_id)
+        await bot.delete_message(message.chat.id, message_id)
+    except Exception as e:
+        logger.error(e)
+
+    keyboard = await build_confirm_announcement_keyboard(group_id)
+
+    confirmation_text = f"Here is the announcement i'll send:\n\n{message.text}"
+
+    await bot.send_message(message.chat.id, text=confirmation_text, reply_markup=keyboard)
+    await state.set_state(AdminPanel.confirming_announcement)
+
+
+@router.callback_query(AdminPanel.confirming_announcement,
+                       AdminCallback.filter((F.action == AdminMenuAction.confirm_announcement) & F.level == 2))
+async def send_announcement(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
+    group_id = await state.get_value("group_id")
+    announcement_text = await state.get_value("announcement_text")
+    announcement = await bot.send_message(chat_id=group_id, text=announcement_text)
+    saved_announcement = await message_service.create_message(group_id=group_id, message_id=announcement.message_id,
+                                                              text=announcement_text, is_watched=True, is_pinned=False)
+    keyboard = await build_confirm_pin_keyboard(group_id=group_id, announcement_id=saved_announcement.message_id)
+    await edit_message_safely(message=callback.message,
+                              text=f"Announcement sent successfully!\nDo you want me to pin it?", reply_markup=keyboard)
+    await state.set_state(AdminPanel.confirming_pin)
+
+
+@router.callback_query(AdminPanel.confirming_pin,
+                       AdminCallback.filter((F.action == AdminMenuAction.confirm_pin) & F.level == 2))
+async def pin_announcement(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
+    await bot.pin_chat_message(chat_id=callback_data.group_id, message_id=callback_data.announcement_id)
+    await message_service.pin_message(group_id=callback_data.group_id, message_id=callback_data.announcement_id)
+    await callback.answer("Pinned successfully!")
+
+    await state.set_state(AdminPanel.managing_features)
+    await process_group_selection(callback, callback_data, state)
+
+
+@router.callback_query(AdminPanel.managing_features,
+                       AdminCallback.filter(F.action == AdminMenuAction.delete_announcement))
+async def confirm_announcement_deletion(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
+    announcement = await message_service.get_message(group_id=callback_data.group_id,
+                                                     message_id=callback_data.announcement_id)
+    text, keyboard = await build_announcement_delete_confirmation(announcement, callback_data.announcement_offset)
+    await edit_message_safely(message=callback.message, text=text, reply_markup=keyboard)
+
+@router.callback_query(AdminCallback.filter(F.action == AdminMenuAction.confirm_delete_announcement))
+async def delete_announcement(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
+    await bot.delete_message(chat_id=callback_data.group_id, message_id=callback_data.announcement_id)
+    await message_service.delete_message(group_id=callback_data.group_id, message_id=callback_data.announcement_id)
+    await callback.answer("Announcement deleted successfully!")
+    await manage_announcements(callback, callback_data, state)
+
+
+@router.callback_query(AdminPanel.managing_features,
+                       AdminCallback.filter(F.action == AdminMenuAction.manage_announcements))
+async def manage_announcements(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
+    offset = callback_data.announcement_offset if callback_data.announcement_offset is not None else 0
+    limit = 1
+    announcements, count = await group_service.get_group_announcements(callback_data.group_id, offset, limit)
+    text, keyboard = await build_announcement_mgmt_message(announcements, callback_data.group_id, count, offset)
+    await edit_message_safely(message=callback.message, text=text, reply_markup=keyboard)
+
+
+@router.callback_query(AdminPanel.managing_features, AdminCallback.filter((F.action == AdminMenuAction.confirm_pin) |
+                                                                          (F.action == AdminMenuAction.confirm_watch)))
+async def toggle_pin_or_watch(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
+    announcement = await message_service.get_message(group_id=callback_data.group_id,
+                                                     message_id=callback_data.announcement_id)
+    if announcement is None:
+        logger.warning(f"Announcement {callback_data.announcement_id} not found in database.")
+        return
+
+    if callback_data.action == AdminMenuAction.confirm_pin:
+        if announcement.is_pinned:
+            await bot.unpin_chat_message(chat_id=callback_data.group_id, message_id=callback_data.announcement_id)
+            await message_service.unpin_message(group_id=callback_data.group_id,
+                                                message_id=callback_data.announcement_id)
+            await callback.answer("Un-pinned successfully!")
+        else:
+            await bot.pin_chat_message(chat_id=callback_data.group_id, message_id=callback_data.announcement_id)
+            await message_service.pin_message(group_id=callback_data.group_id, message_id=callback_data.announcement_id)
+            await callback.answer("Pinned successfully!")
+    if callback_data.action == AdminMenuAction.confirm_watch:
+        if announcement.is_watched:
+            await message_service.unwatch_message(group_id=callback_data.group_id,
+                                                  message_id=callback_data.announcement_id)
+            await callback.answer("Un-watched successfully!")
+        else:
+            await message_service.watch_message(group_id=callback_data.group_id,
+                                                message_id=callback_data.announcement_id)
+            await callback.answer("Watched successfully!")
+
+    await manage_announcements(callback, callback_data, state)
 
 
 @router.callback_query(AdminPanel.managing_greeting_watch,
@@ -184,7 +309,7 @@ async def go_back(callback: CallbackQuery, callback_data: AdminCallback, state: 
         my_groups = await admin_service.get_my_groups(callback.from_user.id)
 
         welcome_text = (
-            f"Hello, my dear tester {callback.from_user.full_name}!\n\n"
+            f"Hello, my dear {callback.from_user.full_name}!\n\n"
             f"Please select a group from the list below:"
         )
 

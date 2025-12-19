@@ -7,6 +7,13 @@ class AdminMenuAction(str, Enum):
     open_feature = 'of'
     toggle_bool = 'tb'
     set_value = 'sv'
+    make_announcement = 'ma'
+    manage_announcements = 'mga'
+    confirm_announcement = 'ca'
+    confirm_delete_announcement = 'cda'
+    delete_announcement = 'da'
+    confirm_pin = 'cp'
+    confirm_watch = 'cw'
     set_greeting_message = 'sgm'
     set_reminder_message = 'srm'
     back = 'b'
@@ -31,5 +38,7 @@ class AdminCallback(CallbackData, prefix='ad'):
     """
     level: int
     action: AdminMenuAction
+    announcement_id: int | None = None
+    announcement_offset: int | None = None
     group_id: int | None = None
     feature_name: GroupFeature| None = None

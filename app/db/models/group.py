@@ -31,6 +31,7 @@ class Group(Base):
 
     members = relationship("GroupMember", back_populates="group", cascade="all, delete-orphan")
     permissions = relationship("GroupPermission", back_populates="group", cascade="all, delete-orphan")
+    messages = relationship("Message", back_populates="group", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Group(id={self.id}, type={self.type} title={self.title}, created_at={self.created_at})>"

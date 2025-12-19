@@ -5,6 +5,8 @@ from loguru import logger
 
 from app.bot.core import bot
 from app.db.session import async_session_maker
+from app.events.emitter import emit_event
+from app.events.schemas import GetGroupAdminsEvent
 from app.handlers.admin_interactions import AdminPanel
 from app.services.admin import AdminService
 from app.services.group import GroupService
@@ -20,79 +22,31 @@ gp_service = GroupPermissionService(async_session_maker)
 admin_service = AdminService(async_session_maker, gp_service)
 
 
-@router.message(F.left_chat_member)
-async def on_member_leave(message: Message):
-    print(message.model_dump_json(indent=4, exclude_none=True))
-
-    print(
-        f"User {message.left_chat_member.id} left chat {message.chat.id} "
-    )
-
-    if message.left_chat_member.id == bot.id:
-        await group_service.leave_group(message.chat.id)
-        await gp_service.get_or_create_group_permissions(message.chat.id, role="left")
-        return
-
-    try:
-        await group_member_service.leave_group(message.chat.id, message.left_chat_member.id)
-    except Exception as e:
-        print(e)
-
-    if await group_service.feature_is_active(message.chat.id, "report_leaving_members"):
-        await user_service.notify_admins(f"User @{message.left_chat_member.username} left '{message.chat.title}'", message.chat.id)
-
-
-@router.message(F.new_chat_members)
-async def on_member_join(message: Message):
-    logger.info(message.model_dump_json(indent=4, exclude_none=True))
-
-    logger.info(
-        f"User {message.from_user.id} joined chat {message.chat.id} "
-    )
-
-    for member in message.new_chat_members:
-
-        if member.id == bot.id:
-            await group_service.get_or_create_group(group_id=message.chat.id, type=message.chat.type,
+@router.chat_member()
+async def on_chat_member_update(message: Message):
+    group = await group_service.get_or_create_group(group_id=message.chat.id, type=message.chat.type,
                                                     title=message.chat.title,
                                                     status="active")
-            await group_member_service.get_or_create_member(group_id=message.chat.id, user_id=message.from_user.id,
-                                                            first_name=message.from_user.first_name,
-                                                            last_name=message.from_user.last_name,
-                                                            username=message.from_user.username, role="administrator",
-                                                            status="active", is_bot=message.from_user.is_bot)
+    member = message.new_chat_member
+    await group_member_service.get_or_create_member(group_id=group.id, user_id=member.user.id,
+                                                    first_name=member.user.first_name,
+                                                    last_name=member.user.last_name, username=member.user.username,
+                                                    is_bot=member.user.is_bot,
+                                                    status="left" if member.status == "kicked" or member.status == "left" else "active",
+                                                    role=member.status)
 
-            my_permissions = await bot.get_chat_member(message.chat.id, bot.id)
+    if group.type == "supergroup" and await group_service.feature_is_active(group.id, "greeting_watch"):
+        greeting_message = await group_service.get_greeting_message(group.id, member.user.username)
+        if greeting_message:
+            await bot.send_message(message.chat.id, greeting_message)
 
-            if my_permissions.status == "member":
-                await gp_service.get_or_create_group_permissions(message.chat.id, role="member")
+    if await group_service.feature_is_active(group.id,
+                                             "report_new_members") and member.status != "kicked" and member.status != "left":
+        await user_service.notify_admins(f"User @{member.user.username} joined '{group.title}'", group.id)
 
-            if my_permissions.status == "administrator":
-                await gp_service.get_or_create_group_permissions(message.chat.id, role=my_permissions.status, can_be_edited=my_permissions.can_be_edited,
-                                                             is_anonymous=my_permissions.is_anonymous, can_manage_chat=my_permissions.can_manage_chat,
-                                                             can_delete_messages=my_permissions.can_delete_messages, can_manage_video_chats=my_permissions.can_manage_video_chats,
-                                                             can_restrict_members=my_permissions.can_restrict_members, can_promote_members=my_permissions.can_promote_members,
-                                                             can_change_info=my_permissions.can_change_info, can_invite_users=my_permissions.can_invite_users,
-                                                             can_post_stories=my_permissions.can_post_stories, can_edit_stories=my_permissions.can_edit_stories,
-                                                             can_delete_stories=my_permissions.can_delete_stories, can_post_messages=my_permissions.can_post_messages,
-                                                             can_edit_messages=my_permissions.can_edit_messages, can_pin_messages=my_permissions.can_pin_messages,
-                                                             can_manage_topics=my_permissions.can_manage_topics, can_manage_direct_messages=my_permissions.can_manage_direct_messages,
-                                                            custom_title=my_permissions.custom_title, can_manage_voice_chats=my_permissions.can_manage_voice_chats)
-
-            continue
-
-        await group_member_service.get_or_create_member(group_id=message.chat.id, user_id=member.id,
-                                                        first_name=member.first_name,
-                                                        last_name=member.last_name, username=member.username,
-                                                        is_bot=member.is_bot, status="active", role="member")
-
-        if await group_service.feature_is_active(message.chat.id, "greeting_watch"):
-            greeting_message = await group_service.get_greeting_message(message.chat.id, member.username)
-            if greeting_message:
-                await bot.send_message(message.chat.id, greeting_message)
-
-        if await group_service.feature_is_active(message.chat.id, "report_new_members"):
-            await user_service.notify_admins(f"User @{member.username} joined '{message.chat.title}'", message.chat.id)
+    if await group_service.feature_is_active(group.id, "report_leaving_members") and (
+            member.status == "kicked" or member.status == "left"):
+        await user_service.notify_admins(f"User @{member.user.username} left '{group.title}'", group.id)
 
 
 @router.message(F.text.contains("#"), ~StateFilter(AdminPanel))
@@ -111,30 +65,34 @@ async def react_to_greeting(message: Message):
 @router.my_chat_member()
 async def on_member_status_change(message: Message):
     member = message.new_chat_member
+    group = await group_service.get_or_create_group(group_id=message.chat.id, type=message.chat.type,
+                                                    title=message.chat.title,
+                                                    status="active")
 
-    if member.user.id != bot.id:
-        await group_member_service.get_or_create_member(group_id=message.chat.id, user_id=member.user.id, role=member.status)
+    if member.status == "administrator" and member.user.id == bot.id:
+        await emit_event("get_group_admins", GetGroupAdminsEvent(group_id=group.id))
+        await gp_service.get_or_create_group_permissions(message.chat.id, role=member.status,
+                                                         can_be_edited=member.can_be_edited,
+                                                         is_anonymous=member.is_anonymous,
+                                                         can_manage_chat=member.can_manage_chat,
+                                                         can_delete_messages=member.can_delete_messages,
+                                                         can_manage_video_chats=member.can_manage_video_chats,
+                                                         can_restrict_members=member.can_restrict_members,
+                                                         can_promote_members=member.can_promote_members,
+                                                         can_change_info=member.can_change_info,
+                                                         can_invite_users=member.can_invite_users,
+                                                         can_post_stories=member.can_post_stories,
+                                                         can_edit_stories=member.can_edit_stories,
+                                                         can_delete_stories=member.can_delete_stories,
+                                                         can_post_messages=member.can_post_messages,
+                                                         can_edit_messages=member.can_edit_messages,
+                                                         can_pin_messages=member.can_pin_messages,
+                                                         can_manage_topics=member.can_manage_topics,
+                                                         can_manage_direct_messages=member.can_manage_direct_messages,
+                                                         custom_title=member.custom_title,
+                                                         can_manage_voice_chats=member.can_manage_voice_chats)
+    elif member.status == "left":
+        await group_service.leave_group(message.chat.id)
+        await gp_service.get_or_create_group_permissions(message.chat.id, role="left")
     else:
-        if member.status == "administrator":
-            await gp_service.get_or_create_group_permissions(message.chat.id, role=member.status,
-                                                                 can_be_edited=member.can_be_edited,
-                                                                 is_anonymous=member.is_anonymous,
-                                                                 can_manage_chat=member.can_manage_chat,
-                                                                 can_delete_messages=member.can_delete_messages,
-                                                                 can_manage_video_chats=member.can_manage_video_chats,
-                                                                 can_restrict_members=member.can_restrict_members,
-                                                                 can_promote_members=member.can_promote_members,
-                                                                 can_change_info=member.can_change_info,
-                                                                 can_invite_users=member.can_invite_users,
-                                                                 can_post_stories=member.can_post_stories,
-                                                                 can_edit_stories=member.can_edit_stories,
-                                                                 can_delete_stories=member.can_delete_stories,
-                                                                 can_post_messages=member.can_post_messages,
-                                                                 can_edit_messages=member.can_edit_messages,
-                                                                 can_pin_messages=member.can_pin_messages,
-                                                                 can_manage_topics=member.can_manage_topics,
-                                                                 can_manage_direct_messages=member.can_manage_direct_messages,
-                                                                 custom_title=member.custom_title,
-                                                                 can_manage_voice_chats=member.can_manage_voice_chats)
-        else:
-            await gp_service.get_or_create_group_permissions(message.chat.id, role=member.status)
+        await gp_service.get_or_create_group_permissions(message.chat.id, role=member.status)

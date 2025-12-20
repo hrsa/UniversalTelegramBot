@@ -28,6 +28,7 @@ async def on_chat_member_update(message: Message):
                                                     title=message.chat.title,
                                                     status="active")
     member = message.new_chat_member
+    member_joined = member.status != "kicked" and member.status != "left"
     await group_member_service.get_or_create_member(group_id=group.id, user_id=member.user.id,
                                                     first_name=member.user.first_name,
                                                     last_name=member.user.last_name, username=member.user.username,
@@ -35,18 +36,17 @@ async def on_chat_member_update(message: Message):
                                                     status="left" if member.status == "kicked" or member.status == "left" else "active",
                                                     role=member.status)
 
-    if group.type == "supergroup" and await group_service.feature_is_active(group.id, "greeting_watch"):
-        greeting_message = await group_service.get_greeting_message(group.id, member.user.username)
-        if greeting_message:
-            await bot.send_message(message.chat.id, greeting_message)
+    if member_joined:
+        if group.type == "supergroup" and await group_service.feature_is_active(group.id, "greeting_watch"):
+            greeting_message = await group_service.get_greeting_message(group.id, member.user.username)
+            if greeting_message:
+                await bot.send_message(message.chat.id, greeting_message)
 
-    if await group_service.feature_is_active(group.id,
-                                             "report_new_members") and member.status != "kicked" and member.status != "left":
-        await user_service.notify_admins(f"User @{member.user.username} joined '{group.title}'", group.id)
-
-    if await group_service.feature_is_active(group.id, "report_leaving_members") and (
-            member.status == "kicked" or member.status == "left"):
-        await user_service.notify_admins(f"User @{member.user.username} left '{group.title}'", group.id)
+        if await group_service.feature_is_active(group.id, "report_new_members"):
+            await user_service.notify_admins(f"User @{member.user.username} joined '{group.title}'", group.id)
+    else:
+        if await group_service.feature_is_active(group.id, "report_leaving_members"):
+            await user_service.notify_admins(f"User @{member.user.username} left '{group.title}'", group.id)
 
 
 @router.message(F.text.contains("#"), ~StateFilter(AdminPanel))

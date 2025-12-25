@@ -4,13 +4,20 @@ from contextlib import asynccontextmanager
 from aiogram.types import Update
 from fastapi import FastAPI, Request, HTTPException
 from loguru import logger
+from stripe import Webhook, SignatureVerificationError, StripeClient
 
 from app.config import settings
 from app.bot.core import dp, bot
-from app.events.emitter import redis_broker
+from app.db.session import async_session_maker
+from app.events.emitter import redis_broker, emit_event
+from app.events.schemas import PaymentReceivedEvent
 from app.handlers import all_routers
 from app.events.listeners import all_listeners
+from app.handlers.admin.announcement import message_service
 from app.scheduler.setup import setup_scheduler, scheduler
+from app.services.group import GroupService
+from app.services.message import MessageService
+from app.services.stripe_payment import StripePaymentService
 
 
 @asynccontextmanager
@@ -60,7 +67,32 @@ async def handle_update(request: Request):
     update_data = await request.json()
     update = Update(**update_data)
     await dp.feed_update(update=update, bot=bot)
-    logger.info(update.model_dump_json(indent=4, exclude_none=True))
+    try:
+        logger.info(update.model_dump_json(indent=4, exclude_none=True))
+    except Exception as e:
+        logger.warning(f"Failed to log update: {e}")
+        logger.warning(update_data)
+    return {"status": "OK"}
+
+@app.post("/stripe")
+async def stripe_webhook(request: Request):
+    headers = request.headers
+    stripe_signature = headers.get("Stripe-Signature", None)
+
+    try:
+        event = Webhook.construct_event(payload=await request.body(), sig_header=stripe_signature, secret=settings.STRIPE_SIGNING_SECRET)
+        # logger.info(event)
+        if event.type == "checkout.session.completed":
+            user_id = event.data.object.metadata.get("user_id", None)
+            payment_id = event.data.object.payment_link
+            await emit_event("payment_received", PaymentReceivedEvent(user_id=user_id, payment_link_id=payment_id))
+            logger.warning(event)
+    except ValueError:
+        logger.error("Error while decoding event")
+        return {"status": "Error while decoding event", "code": 400}
+    except SignatureVerificationError:
+        logger.error("Invalid signature")
+        return {"status": "Invalid signature", "code": 401}
     return {"status": "OK"}
 
 

@@ -4,6 +4,22 @@ from app.db.repositories import user as user_repo
 from app.bot.core import bot
 
 
+async def notify_user(message: str, user_id: int | None, group_id: int | None = None):
+    try:
+        await bot.send_message(chat_id=group_id if group_id is not None else user_id,
+                               text=message, parse_mode="HTML")
+    except Exception as e:
+        logger.error(e)
+
+
+async def kick_user(group_id: int, user_id: int):
+    try:
+        await bot.ban_chat_member(group_id, user_id)
+        await bot.unban_chat_member(group_id, user_id)
+    except Exception as e:
+        logger.error(e)
+
+
 class UserService:
     def __init__(self, session: async_sessionmaker):
         self.session = session
@@ -19,21 +35,7 @@ class UserService:
         async with self.session() as session:
             return await user_repo.get_group_admins(session, group_id)
 
-    async def kick_user(self, group_id: int, user_id: int):
-        try:
-            await bot.ban_chat_member(group_id, user_id)
-            await bot.unban_chat_member(group_id, user_id)
-        except Exception as e:
-            logger.error(e)
-
-    async def notify_user(self, user_id: int, message: str, group_id: int | None = None):
-        try:
-            await bot.send_message(chat_id=group_id if group_id is not None else user_id,
-                                   text=message)
-        except Exception as e:
-            logger.error(e)
-
     async def notify_admins(self, message: str, group_id: int):
         admins = await self.get_group_admins(group_id)
         for admin in admins:
-            await self.notify_user(admin.id, message)
+            await notify_user(user_id=admin.id, message=message)

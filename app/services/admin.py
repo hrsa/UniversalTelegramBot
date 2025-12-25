@@ -6,17 +6,25 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from app.db.models.group import Group
 from app.db.repositories import group as group_repo
 from app.schemas.group_features import GroupFeatures, ChannelFeatures
+from app.services.group import GroupService
 from app.services.group_permission import GroupPermissionService
 
 
 class AdminService:
-    def __init__(self, session: async_sessionmaker, group_permission_service: GroupPermissionService):
+    def __init__(self, session: async_sessionmaker, group_service: GroupService, group_permission_service: GroupPermissionService):
         self.session = session
+        self.group_service = group_service
         self.gp_service = group_permission_service
 
-    async def get_my_groups(self, user_id) -> Sequence[Group]:
+    async def get_my_groups(self, user_id: int) -> Sequence[Group]:
         async with self.session() as session:
             groups = await group_repo.get_groups_managed_by_user(session, user_id)
+
+        return groups
+
+    async def get_my_groups_for_invitation(self, user_id: int, main_group_id: int) -> Sequence[Group]:
+        async with self.session() as session:
+            groups = await group_repo.get_groups_eligible_for_invitation(session, user_id, main_group_id)
 
         return groups
 
@@ -94,13 +102,9 @@ class AdminService:
         if hashtag[0] != "#":
             hashtag = "#" + hashtag
 
-        async with self.session() as session:
-            group = await group_repo.set_group_greeting(session, group_id, hashtag, message.text)
-            return group
+        return await self.group_service.update_group(group_id, greeting_hashtag=hashtag, greeting_message=message.text)
 
     async def set_group_reminder(self, group_id: int, reminder_message: str) -> Group:
         if not reminder_message:
             raise ValueError("Reminder message cannot be empty.")
-        async with self.session() as session:
-            group = await group_repo.set_reminder_message(session, group_id, reminder_message)
-            return group
+        return await self.group_service.update_group(group_id, reminder_message=reminder_message)

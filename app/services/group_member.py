@@ -4,6 +4,7 @@ from aiogram.types import Message
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.db.models.group_member import GroupMember
+from app.schemas.literals import UserRole, UserStatus, GroupType
 from app.services.group import GroupService
 from app.services.user import UserService
 from app.db.repositories import group_member as group_member_repo
@@ -16,13 +17,15 @@ class GroupMemberService:
         self.group_service = group_service
         self.user_service = user_service
 
-    async def get_or_create_member(self, group_id: int, user_id: int, first_name: str | None = None,
-                                   last_name: str | None = None, username: str | None = None, role: str | None = None,
-                                   status: str | None = None, is_bot: bool | None = None):
+    async def get_or_create_member(self, group_id: int, user_id: int, group_title: str | None = None,
+                                   group_type: GroupType | None = None, first_name: str | None = None,
+                                   last_name: str | None = None, username: str | None = None,
+                                   role: UserRole | None = None,
+                                   status: UserStatus | None = None, is_bot: bool | None = None):
         async with self.session() as session:
             user = await self.user_service.get_or_create_user(user_id=user_id, first_name=first_name,
                                                               last_name=last_name, username=username, is_bot=is_bot)
-            group = await self.group_service.get_or_create_group(group_id=group_id)
+            group = await self.group_service.get_or_create_group(group_id=group_id, group_type=group_type, title=group_title)
 
             group_member = await self.group_member_repo.get_or_create_group_member(session, group_id=group.id,
                                                                                    user_id=user.id, role=role,
@@ -34,7 +37,7 @@ class GroupMemberService:
         async with self.session() as session:
             await self.get_or_create_member(group_id, user_id)
             group_member = await self.group_member_repo.set_member_status(session, group_id=group_id, user_id=user_id,
-                                                                     status="left")
+                                                                          status="left")
         return group_member
 
     async def member_has_greeting(self, group_id: int, user_id: int):
@@ -55,14 +58,14 @@ class GroupMemberService:
 
         if group.greeting_hashtag in hashtags:
             async with self.session() as session:
-                await self.group_member_repo.set_member_greeting_message(session, group_id=group.id, user_id=user_id, message=message.text)
+                await self.group_member_repo.set_member_greeting_message(session, group_id=group.id, user_id=user_id,
+                                                                         message=message.text)
                 return True
         return False
 
     async def get_members_without_greetings(self, group_id: int | None = None) -> Sequence[GroupMember]:
         async with self.session() as session:
             return await group_member_repo.get_members_without_greetings(session, group_id)
-
 
     async def increase_warning_count(self, group_id: int, user_id: int) -> GroupMember:
         async with self.session() as session:

@@ -7,7 +7,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     BOT_TOKEN: str
-    BOT_TELEGRAM_ID: Optional[int] = None
+    ADMIN_TELEGRAM_ID: int
+    STRIPE_API_KEY: str
+    STRIPE_SIGNING_SECRET: str
     WEBHOOK_URL: str
     WEBHOOK_SECRET: str
     DOMAIN: str

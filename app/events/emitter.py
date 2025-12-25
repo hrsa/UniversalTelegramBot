@@ -9,7 +9,8 @@ redis_broker = RedisBroker(f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}
 EventType = Literal[
     "member_with_no_greeting.notify",
     "member_with_no_greeting.kick",
-    "get_group_admins"
+    "get_group_admins",
+    "payment_received"
 ]
 
 

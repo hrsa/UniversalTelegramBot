@@ -8,7 +8,7 @@ from app.events.schemas import MemberWithNoGreetingEvent
 from app.services.group import GroupService
 from app.services.group_member import GroupMemberService
 from app.services.group_permission import GroupPermissionService
-from app.services.user import UserService
+from app.services.user import UserService, kick_user, notify_user
 
 group_service = GroupService(async_session_maker)
 user_service = UserService(async_session_maker)
@@ -44,7 +44,7 @@ async def on_kick_member_with_no_greeting(event: MemberWithNoGreetingEvent):
         await emit_event("member_with_no_greeting.notify", MemberWithNoGreetingEvent(user_id=event.user_id, group_id=event.group_id))
         return
 
-    await user_service.kick_user(event.group_id, event.user_id)
+    await kick_user(event.group_id, event.user_id)
     await user_service.notify_admins(f"I've kicked @{user.username} from {group.title}.", event.group_id)
     await group_member_service.reset_warning_count(group_id=event.group_id, user_id=event.user_id)
 
@@ -55,7 +55,7 @@ async def on_notify_member_with_no_greeting(event: MemberWithNoGreetingEvent):
     greeting_message = await group_service.get_greeting_message(event.group_id, user.username)
     reminder_message = await group_service.get_reminder_message(event.group_id, user.username)
 
-    await user_service.notify_user(
+    await notify_user(
         user_id=event.user_id,
         group_id=event.group_id,
         message=f"{reminder_message}\n\n{greeting_message}")

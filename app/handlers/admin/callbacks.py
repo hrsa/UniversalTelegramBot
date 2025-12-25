@@ -2,6 +2,9 @@ from enum import Enum
 
 from aiogram.filters.callback_data import CallbackData
 
+from app.schemas.literals import RewardType
+
+
 class AdminMenuAction(str, Enum):
     select_group = 'sg'
     open_feature = 'of'
@@ -9,6 +12,14 @@ class AdminMenuAction(str, Enum):
     set_value = 'sv'
     make_announcement = 'ma'
     manage_announcements = 'mga'
+    confirm_edit_announcement = 'cea'
+    confirm_add_payment_product = 'cap'
+    skip_to_pin_announcement = 'stp'
+    set_payment_expiration_date = 'sep'
+    set_participants_limit = 'spl'
+    set_announcement_button_name = 'sbn'
+    set_reward_type = 'srt'
+    set_invitation_group = 'sgi'
     confirm_announcement = 'ca'
     confirm_delete_announcement = 'cda'
     delete_announcement = 'da'
@@ -25,6 +36,10 @@ class GroupFeature(str, Enum):
     max_warning_count = 'mwc'
     report_new_members = 'rnm'
     report_leaving_members = 'rlm'
+    allow_payments = 'ap'
+
+class AnnouncementAction(str, Enum):
+    join = 'j'
 
 
 class AdminCallback(CallbackData, prefix='ad'):
@@ -42,3 +57,10 @@ class AdminCallback(CallbackData, prefix='ad'):
     announcement_offset: int | None = None
     group_id: int | None = None
     feature_name: GroupFeature| None = None
+    reward_type: RewardType | None = None
+
+
+class AnnouncementCallback(CallbackData, prefix='an'):
+    action: AnnouncementAction
+    announcement_id: int
+    event_name: str | None = None

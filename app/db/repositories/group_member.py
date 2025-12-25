@@ -6,14 +6,15 @@ from sqlalchemy.sql.functions import func
 
 from app.db.models.group import Group
 from app.db.models.group_member import GroupMember
+from app.schemas.literals import UserRole, UserStatus
 
 
 async def get_or_create_group_member(
         session: AsyncSession,
         group_id: int,
         user_id: int,
-        role: str | None = None,
-        status: str | None = None,
+        role: UserRole | None = None,
+        status: UserStatus | None = None,
 ) -> GroupMember:
     result = await session.execute(
         select(GroupMember).where((GroupMember.group_id == group_id) & (GroupMember.user_id == user_id))
@@ -54,7 +55,7 @@ async def get_or_create_group_member(
     return group_member
 
 
-async def set_member_status(session: AsyncSession, group_id: int, user_id, status: str) -> GroupMember:
+async def set_member_status(session: AsyncSession, group_id: int, user_id: int, status: UserStatus) -> GroupMember:
     group_member = await get_or_create_group_member(session, group_id, user_id)
     group_member.status = status
     if status == "active":

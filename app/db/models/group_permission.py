@@ -12,7 +12,7 @@ class GroupPermission(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
 
-    group_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("groups.id"), nullable=False)
+    group_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
 
     role: Mapped[str] = mapped_column(String(50), nullable=True)
 

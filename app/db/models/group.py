@@ -5,17 +5,19 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
+from app.schemas.literals import GroupStatus, GroupType
+
 
 class Group(Base):
     __tablename__ = "groups"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
 
-    type: Mapped[str] = mapped_column(String(50), nullable=True)
+    type: Mapped[GroupType | None] = mapped_column(String(50), nullable=True)
 
     title: Mapped[str] = mapped_column(String(120), nullable=True)
 
-    status: Mapped[str] = mapped_column(String(50), nullable=True)
+    status: Mapped[GroupStatus | None] = mapped_column(String(50), nullable=True)
 
     features: Mapped[dict] = mapped_column(JSONB, server_default="{}", nullable=False)
 
@@ -32,6 +34,7 @@ class Group(Base):
     members = relationship("GroupMember", back_populates="group", cascade="all, delete-orphan")
     permissions = relationship("GroupPermission", back_populates="group", cascade="all, delete-orphan")
     messages = relationship("Message", back_populates="group", cascade="all, delete-orphan")
+    rewards = relationship("Reward", back_populates="group", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Group(id={self.id}, type={self.type} title={self.title}, created_at={self.created_at})>"

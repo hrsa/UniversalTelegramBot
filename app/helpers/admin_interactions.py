@@ -1,13 +1,16 @@
-from typing import Sequence
+from typing import Sequence, get_args
 
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import InlineKeyboardMarkup, MaybeInaccessibleMessageUnion
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from loguru import logger
 
+from app.bot.core import bot
 from app.db.models.group import Group
 from app.db.models.message import Message
-from app.handlers.callbacks import AdminCallback, AdminMenuAction, GroupFeature
+from app.handlers.admin.callbacks import AdminCallback, AdminMenuAction, GroupFeature
+from app.schemas.group_features import ChannelFeatures, GroupFeatures
+from app.schemas.literals import RewardType
 from app.services.group import GroupService
 
 
@@ -24,6 +27,15 @@ async def edit_message_safely(message: MaybeInaccessibleMessageUnion, text: str,
             raise
 
 
+async def delete_messages_safely(chat_id: int, message_ids: Sequence[int]):
+    for message_id in message_ids:
+        try:
+            await bot.delete_message(chat_id=chat_id, message_id=message_id)
+        except Exception as e:
+            logger.error(f"Failed to delete message {message_id} in chat {chat_id}: {e}")
+            continue
+
+
 async def build_group_selection_keyboard(groups: Sequence[Group]) -> InlineKeyboardMarkup:
     if len(groups) == 0:
         return InlineKeyboardMarkup(inline_keyboard=[])
@@ -38,8 +50,8 @@ async def build_group_selection_keyboard(groups: Sequence[Group]) -> InlineKeybo
     return builder.as_markup()
 
 
-async def build_main_features_keyboard(group_id: int, group_service: GroupService) -> InlineKeyboardMarkup:
-    features = await group_service.get_features(group_id)
+async def build_main_features_keyboard(group_id: int, features: GroupFeatures | ChannelFeatures,
+                                       is_creator: bool = False) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="Make a new announcement ➡️",
                    callback_data=AdminCallback(level=1, action=AdminMenuAction.make_announcement,
@@ -50,9 +62,18 @@ async def build_main_features_keyboard(group_id: int, group_service: GroupServic
 
     for name, value in features.model_dump().items():
         button_text = name.replace("_", " ").capitalize()
+        logger.debug(f"Building keyboard for feature {name}: {value}")
+        logger.debug(f"is_creator: {is_creator}")
         if name == "greeting_watch":
             button_text = "Greeting Watch ➡️"
             action = AdminMenuAction.open_feature
+        elif name == "allow_payments":
+            if is_creator:
+                button_text = "Allow Payments"
+                button_text += " ✅" if value else " ❌"
+                action = AdminMenuAction.toggle_bool
+            else:
+                continue
         elif isinstance(value, bool):
             button_text += " ✅" if value else " ❌"
             action = AdminMenuAction.toggle_bool
@@ -154,8 +175,8 @@ async def build_announcement_mgmt_message(announcements: Sequence[Message], grou
     if not announcements:
         text = "No announcements yet."
         builder.button(text="⬅️ Back",
-                   callback_data=AdminCallback(level=2, action=AdminMenuAction.back,
-                                               group_id=group_id).pack())
+                       callback_data=AdminCallback(level=2, action=AdminMenuAction.back,
+                                                   group_id=group_id).pack())
         return text, builder.as_markup()
     current_announcement = announcements[0]
     creation_date = current_announcement.created_at.strftime("%d.%m.%Y - %H:%M")
@@ -174,16 +195,16 @@ async def build_announcement_mgmt_message(announcements: Sequence[Message], grou
                                                               ).pack())
     builder.button(text="Un-pin 📌" if current_announcement.is_pinned else "Pin 📌",
                    callback_data=AdminCallback(level=2, action=AdminMenuAction.confirm_pin,
-                                                           announcement_offset=offset,
-                                                           announcement_id=current_announcement.message_id,
-                                                           group_id=group_id
-                                                           ).pack())
+                                               announcement_offset=offset,
+                                               announcement_id=current_announcement.message_id,
+                                               group_id=group_id
+                                               ).pack())
     builder.button(text="Un-watch 👀" if current_announcement.is_watched else "Watch 👀",
                    callback_data=AdminCallback(level=2, action=AdminMenuAction.confirm_watch,
-                                                             announcement_offset=offset,
-                                                             announcement_id=current_announcement.message_id,
-                                                             group_id=group_id
-                                                             ).pack())
+                                               announcement_offset=offset,
+                                               announcement_id=current_announcement.message_id,
+                                               group_id=group_id
+                                               ).pack())
 
     builder.button(text="Delete 🗑️",
                    callback_data=AdminCallback(level=2, action=AdminMenuAction.delete_announcement,
@@ -196,15 +217,24 @@ async def build_announcement_mgmt_message(announcements: Sequence[Message], grou
                    callback_data=AdminCallback(level=2, action=AdminMenuAction.back,
                                                group_id=group_id).pack())
     if button_count > 1:
-        builder.adjust(2, 1, 1)
+        builder.adjust(2, 1)
     else:
         builder.adjust(1)
     return text, builder.as_markup()
 
-async def build_announcement_delete_confirmation(announcement: Message, offset: int) -> tuple[str, InlineKeyboardMarkup]:
+
+async def build_announcement_delete_confirmation(announcement: Message, offset: int) -> tuple[
+    str, InlineKeyboardMarkup]:
     builder = InlineKeyboardBuilder()
     creation_date = announcement.created_at.strftime("%d.%m.%Y - %H:%M")
-    text = f"Are you sure you want to delete the announcement?\n\n{creation_date}\n\n{announcement.text}"
+    expiration_date = announcement.payment_expires_at.strftime("%d.%m.%Y") if announcement.payment_expires_at else None
+    text = f"Are you sure you want to delete the announcement?\n\n{creation_date}\n\n{announcement.text}\n\nPayment expiration date: {expiration_date if expiration_date else 'N/A'}"
+
+    builder.button(text="⬅️ Back",
+                   callback_data=AdminCallback(level=2, action=AdminMenuAction.back,
+                                               announcement_offset=offset,
+                                               announcement_id=announcement.message_id,
+                                               group_id=announcement.group_id).pack())
 
     builder.button(text="Delete 🗑️",
                    callback_data=AdminCallback(level=2, action=AdminMenuAction.confirm_delete_announcement,
@@ -212,11 +242,42 @@ async def build_announcement_delete_confirmation(announcement: Message, offset: 
                                                announcement_id=announcement.message_id,
                                                group_id=announcement.group_id
                                                ).pack())
-
-    builder.button(text="⬅️ Back",
-                   callback_data=AdminCallback(level=2, action=AdminMenuAction.back,
-                                               announcement_offset=offset,
-                                               announcement_id=announcement.message_id,
-                                               group_id=announcement.group_id).pack())
     builder.adjust(2)
     return text, builder.as_markup()
+
+
+async def build_skip_button(announcement_id: int, group_id: int, action: AdminMenuAction,
+                            button_name: str | None = None) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+
+    builder.button(text=button_name if button_name is not None else "Skip",
+                   callback_data=AdminCallback(level=2, action=action,
+                                               announcement_id=announcement_id,
+                                               group_id=group_id).pack())
+
+    return builder.as_markup()
+
+
+async def build_reward_type_keyboard(announcement_id: int, group_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+
+    for reward_type in get_args(RewardType):
+        builder.button(text=reward_type.capitalize(),
+                       callback_data=AdminCallback(level=2, action=AdminMenuAction.set_reward_type,
+                                                   announcement_id=announcement_id, group_id=group_id,
+                                                   reward_type=reward_type).pack())
+
+    return builder.as_markup()
+
+async def build_invitation_group_keyboard(groups: Sequence[Group]) -> InlineKeyboardMarkup:
+    if len(groups) == 0:
+        return InlineKeyboardMarkup(inline_keyboard=[])
+
+    builder = InlineKeyboardBuilder()
+    for group in groups:
+        builder.button(text=group.title,
+                       callback_data=AdminCallback(level=2, action=AdminMenuAction.set_invitation_group,
+                                                   group_id=group.id).pack())
+
+    builder.adjust(1)
+    return builder.as_markup()

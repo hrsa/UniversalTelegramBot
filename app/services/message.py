@@ -17,10 +17,12 @@ class MessageService:
         self.session = session
 
     async def get_message(self, announcement_id: int | None = None, group_id: int | None = None,
-                          message_id: int | None = None) -> Message | None:
+                          message_id: int | None = None, with_rewards: bool = False,
+                          with_reward_groups: bool = False, with_payments: bool = False) -> Message | None:
         async with self.session() as session:
             message = await message_repo.get_message(session, announcement_id=announcement_id, group_id=group_id,
-                                                     message_id=message_id)
+                                                     message_id=message_id, with_rewards=with_rewards,
+                                                     with_reward_groups=with_reward_groups, with_payments=with_payments)
         return message
 
     async def create_message(self, group_id: int, message_id: int, is_watched: bool | None = None,
@@ -111,7 +113,8 @@ class MessageService:
         return message.early_bird_stripe_product_id if early_bird_limit <= payment_count else message.stripe_product_id
 
     async def add_button_to_announcement(self, group_id: int, message_id: int, button_text: str,
-                                         action: AnnouncementAction = AnnouncementAction.join, event_name: str | None = None):
+                                         action: AnnouncementAction = AnnouncementAction.join,
+                                         event_name: str | None = None):
         message = await self.get_message(group_id=group_id, message_id=message_id)
         if message is None:
             raise ValueError(f"Message with id {message_id} not found in group {group_id}")
@@ -121,7 +124,8 @@ class MessageService:
 
         builder = InlineKeyboardBuilder()
         builder.button(text=button_text,
-                       callback_data=AnnouncementCallback(action=action, announcement_id=message.id, event_name=event_name).pack())
+                       callback_data=AnnouncementCallback(action=action, announcement_id=message.id,
+                                                          event_name=event_name).pack())
 
         try:
             await bot.edit_message_reply_markup(chat_id=group_id, message_id=message_id,

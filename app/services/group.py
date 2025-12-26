@@ -84,11 +84,14 @@ class GroupService:
         return reminder_message.replace("%USERNAME%", f"@{username}") if reminder_message else None
 
     async def get_group_announcements(self, group_id: int,
-                                      offset: int | None = None,
-                                      limit: int | None = None) -> tuple[Sequence[Message], int]:
+                                      offset: int | None = None, limit: int | None = None,
+                                      with_rewards: bool = False, with_reward_groups: bool = False,
+                                      with_payments: bool = False) -> tuple[Sequence[Message], int]:
         async with self.session() as session:
             return await message_repo.get_messages_for_group(session=session, group_id=group_id, offset=offset,
-                                                             limit=limit)
+                                                             limit=limit, with_rewards=with_rewards,
+                                                             with_reward_groups=with_reward_groups,
+                                                             with_payments=with_payments)
 
     async def get_group_invite_link(self, group_id: int | Mapped[int], link_name: str | None = None) -> ChatInviteLink:
         group = await self.get_or_create_group(group_id)

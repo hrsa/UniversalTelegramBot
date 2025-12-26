@@ -29,8 +29,8 @@ class GroupMember(Base):
 
     left_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
-    user = relationship("User", back_populates="groups")
-    group = relationship("Group", back_populates="members")
+    user: Mapped["User"] = relationship("User", back_populates="groups")
+    group: Mapped["Group"] = relationship("Group", back_populates="members")
 
     @hybrid_property
     def is_active_admin(self) -> bool:

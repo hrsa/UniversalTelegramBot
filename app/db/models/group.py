@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import List, Optional
 
 from sqlalchemy import BigInteger, String, TIMESTAMP, func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -31,10 +32,10 @@ class Group(Base):
 
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), onupdate=func.now(), nullable=True)
 
-    members = relationship("GroupMember", back_populates="group", cascade="all, delete-orphan")
-    permissions = relationship("GroupPermission", back_populates="group", cascade="all, delete-orphan")
-    messages = relationship("Message", back_populates="group", cascade="all, delete-orphan")
-    rewards = relationship("Reward", back_populates="group", cascade="all, delete-orphan")
+    members: Mapped[Optional[List["GroupMember"]]] = relationship("GroupMember", back_populates="group", cascade="all, delete-orphan")
+    permissions: Mapped[Optional["GroupPermission"]] = relationship("GroupPermission", back_populates="group", cascade="all, delete-orphan")
+    messages: Mapped[Optional[List["Message"]]] = relationship("Message", back_populates="group", cascade="all, delete-orphan")
+    rewards: Mapped[Optional[List["Reward"]]] = relationship("Reward", back_populates="group", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Group(id={self.id}, type={self.type} title={self.title}, created_at={self.created_at})>"

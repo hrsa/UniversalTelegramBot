@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import BigInteger, TIMESTAMP, func, Boolean, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -23,8 +24,8 @@ class Reward(Base):
 
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
-    message = relationship("Message", back_populates="reward")
-    group = relationship("Group", back_populates="rewards")
+    message: Mapped["Message"] = relationship("Message", back_populates="reward")
+    group: Mapped[Optional["Group"]] = relationship("Group", back_populates="rewards")
 
     def __repr__(self):
-        return f"<Reward (id={self.id}, user_id={self.user_id}, message_id={self.message_id}, type={self.type}, thank_you={self.thank_you}, group_id={self.group_id}, created_at={self.created_at})>"
+        return f"<Reward (id={self.id}, message_id={self.message_id}, type={self.type}, thank_you={self.thank_you}, group_id={self.group_id}, created_at={self.created_at})>"

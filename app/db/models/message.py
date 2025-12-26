@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Optional, List
 
 from sqlalchemy import BigInteger, TIMESTAMP, func, Boolean, ForeignKey, String
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -12,7 +13,8 @@ class Message(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
 
-    group_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
+    group_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
+                                          nullable=False)
 
     message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
 
@@ -38,9 +40,11 @@ class Message(Base):
     def is_expired(self) -> bool:
         return self.payment_expires_at is not None and self.payment_expires_at < datetime.now(timezone.utc)
 
-    group = relationship("Group", back_populates="messages")
-    payments = relationship("Payment", back_populates="message")
-    reward = relationship("Reward", back_populates="message")
+    group: Mapped["Group"] = relationship("Group", back_populates="messages")
+    payments: Mapped[Optional[List["Payment"]]] = relationship("Payment", back_populates="message")
+    reward: Mapped[Optional["Reward"]] = relationship("Reward", back_populates="message")
 
     def __repr__(self):
-        return f"<Message(id={self.id}, group_id={self.group_id}, message_id={self.message_id}, is_pinned={self.is_pinned}, stripe_product_id={self.stripe_product_id}, created_at={self.created_at})>"
+        return (f"<Message(id={self.id}, group_id={self.group_id}, message_id={self.message_id}, text={self.text}, "
+                f"is_pinned={self.is_pinned}, stripe_product_id={self.stripe_product_id}, created_at={self.created_at}, "
+                f"payment_expires_at={self.payment_expires_at})>")

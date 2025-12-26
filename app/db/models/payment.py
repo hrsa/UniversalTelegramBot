@@ -31,8 +31,8 @@ class Payment(Base):
 
     claimed_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
-    user = relationship("User", back_populates="payments")
-    message = relationship("Message", back_populates="payments")
+    user: Mapped["User"] = relationship("User", back_populates="payments")
+    message: Mapped["Message"] = relationship("Message", back_populates="payments")
 
     def __repr__(self):
         return f"<Payment (id={self.id}, user_id={self.user_id}, message_id={self.message_id}, status={self.status}, amount={self.amount}, claimed_at={self.claimed_at})>"

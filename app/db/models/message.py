@@ -22,19 +22,19 @@ class Message(Base):
 
     is_watched: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    text: Mapped[str] = mapped_column(String, nullable=True)
+    text: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    stripe_product_id: Mapped[str] = mapped_column(String, nullable=True)
+    stripe_product_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    early_bird_stripe_product_id: Mapped[str] = mapped_column(String, nullable=True)
+    early_bird_stripe_product_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    participants_limit: Mapped[int] = mapped_column(BigInteger, nullable=True)
+    participants_limit: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
-    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), onupdate=func.now(), nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), onupdate=func.now(), nullable=True)
 
-    payment_expires_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    payment_expires_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     @hybrid_property
     def is_expired(self) -> bool:

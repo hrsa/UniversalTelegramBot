@@ -16,21 +16,21 @@ class Group(Base):
 
     type: Mapped[GroupType | None] = mapped_column(String(50), nullable=True)
 
-    title: Mapped[str] = mapped_column(String(120), nullable=True)
+    title: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
     status: Mapped[GroupStatus | None] = mapped_column(String(50), nullable=True)
 
     features: Mapped[dict] = mapped_column(JSONB, server_default="{}", nullable=False)
 
-    greeting_hashtag: Mapped[str] = mapped_column(String(64), nullable=True)
+    greeting_hashtag: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
-    greeting_message: Mapped[str] = mapped_column(String(360), nullable=True)
+    greeting_message: Mapped[str | None] = mapped_column(String(360), nullable=True)
 
-    reminder_message: Mapped[str] = mapped_column(String(360), nullable=True)
+    reminder_message: Mapped[str | None] = mapped_column(String(360), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
-    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), onupdate=func.now(), nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), onupdate=func.now(), nullable=True)
 
     members: Mapped[Optional[List["GroupMember"]]] = relationship("GroupMember", back_populates="group", cascade="all, delete-orphan")
     permissions: Mapped[Optional["GroupPermission"]] = relationship("GroupPermission", back_populates="group", cascade="all, delete-orphan")

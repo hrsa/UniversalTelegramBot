@@ -18,9 +18,9 @@ class Reward(Base):
 
     type: Mapped[RewardType | None] = mapped_column(String, nullable=True)
 
-    thank_you: Mapped[str] = mapped_column(String, nullable=True)
+    thank_you: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    group_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=True)
+    group_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 

@@ -12,13 +12,13 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
 
-    username: Mapped[str] = mapped_column(String(50), nullable=True)
+    username: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     is_bot: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    first_name: Mapped[str] = mapped_column(String(50), nullable=True)
+    first_name: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
-    last_name: Mapped[str] = mapped_column(String(50), nullable=True)
+    last_name: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 

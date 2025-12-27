@@ -14,9 +14,9 @@ class GroupPermission(Base):
 
     group_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
 
-    role: Mapped[str] = mapped_column(String(50), nullable=True)
+    role: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
-    custom_title: Mapped[str] = mapped_column(String(80), nullable=True)
+    custom_title: Mapped[str | None] = mapped_column(String(80), nullable=True)
 
     can_be_edited: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
@@ -54,7 +54,7 @@ class GroupPermission(Base):
 
     can_manage_voice_chats: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), onupdate=func.now(), nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), onupdate=func.now(), nullable=True)
 
     group: Mapped["Group"] = relationship("Group", back_populates="permissions")
 

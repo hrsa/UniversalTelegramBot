@@ -17,17 +17,17 @@ class GroupMember(Base):
 
     group_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("groups.id", onupdate="CASCADE"), nullable=False)
 
-    role: Mapped[UserRole] = mapped_column(String(50), nullable=True)
+    role: Mapped[UserRole | None] = mapped_column(String(50), nullable=True)
 
-    status: Mapped[UserStatus] = mapped_column(String(50), nullable=True)
+    status: Mapped[UserStatus | None] = mapped_column(String(50), nullable=True)
 
-    greeting_message: Mapped[str] = mapped_column(String, nullable=True)
+    greeting_message: Mapped[str | None] = mapped_column(String, nullable=True)
 
     warning_count: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
 
-    joined_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=True)
+    joined_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=True)
 
-    left_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    left_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     user: Mapped["User"] = relationship("User", back_populates="groups")
     group: Mapped["Group"] = relationship("Group", back_populates="members")

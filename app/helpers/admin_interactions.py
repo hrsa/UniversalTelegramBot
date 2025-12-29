@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped
 from app.bot.core import bot
 from app.db.models.group import Group
 from app.db.models.message import Message
+from app.db.models.payment import Payment
 from app.handlers.admin.callbacks import AdminCallback, AdminMenuAction, GroupFeature
 from app.schemas.group_features import ChannelFeatures, GroupFeatures
 from app.schemas.literals import RewardType
@@ -170,7 +171,7 @@ async def build_confirm_pin_keyboard(group_id: int, announcement_id: int) -> Inl
     return builder.as_markup()
 
 
-async def build_announcement_mgmt_message(announcement: Message, group_id: int, count: int,
+async def build_announcement_mgmt_message(announcement: Message | None, group_id: int, count: int,
                                           offset: int, can_add_payments: bool | None = False,
                                           can_pin_announcements: bool | None = False) -> tuple[
     str, InlineKeyboardMarkup]:
@@ -226,6 +227,10 @@ async def build_announcement_mgmt_message(announcement: Message, group_id: int, 
 async def add_payment_buttons(builder: InlineKeyboardBuilder, announcement: Message, group_id: int):
     confirmed, expired, pending, waiting = await get_payment_counts(announcement)
     no_current_payments = confirmed + pending + waiting == 0
+    if announcement.payments:
+        builder.button(text="Participants list",
+                       callback_data=AdminCallback(level=2, action=AdminMenuAction.get_announcement_participants,
+                                                   announcement_id=announcement.message_id, group_id=group_id).pack())
     if announcement.stripe_product_id:
         builder.button(text="Modify expiration date" if announcement.payment_expires_at else "Set expiration date",
                        callback_data=AdminCallback(level=2, action=AdminMenuAction.modify_expiration_date,
@@ -387,3 +392,20 @@ async def build_remove_payment_keyboard(announcement_id: int | Mapped[int], grou
                                                announcement_id=announcement_id, group_id=group_id).pack())
     builder.adjust(1)
     return builder.as_markup()
+
+async def build_participants_list(payments: Sequence[Payment]) -> str:
+    if len(payments) == 0:
+        return "No participants yet."
+    text = ""
+    i = 1
+    for payment in payments:
+        if not payment.user:
+            logger.error(f"Payment {payment.id} has no user attached.")
+            continue
+        name = payment.user.full_name if payment.user.full_name else " "
+        username = f"@{payment.user.username}" if payment.user.username else ""
+        text += f"{i}) {name} ({username}) - {payment.status}\n"
+        i += 1
+
+    return text
+

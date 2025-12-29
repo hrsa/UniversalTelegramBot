@@ -43,7 +43,7 @@ class Message(Base):
         return self.created_at is not None and self.created_at > datetime.now(timezone.utc) - timedelta(hours=48)
 
     group: Mapped["Group"] = relationship("Group", back_populates="messages")
-    payments: Mapped[Optional[List["Payment"]]] = relationship("Payment", back_populates="message")
+    payments: Mapped[Optional[List["Payment"]]] = relationship("Payment", back_populates="message", order_by="[Payment.status, Payment.created_at.desc()]")
     reward: Mapped[Optional["Reward"]] = relationship("Reward", back_populates="message")
 
     def __repr__(self):

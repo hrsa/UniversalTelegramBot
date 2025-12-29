@@ -15,7 +15,7 @@ from app.handlers.admin.callbacks import AdminCallback, AdminMenuAction
 from app.helpers.admin_interactions import edit_message_safely, build_confirm_announcement_keyboard, \
     build_confirm_pin_keyboard, delete_messages_safely, build_skip_button, build_reward_type_keyboard, \
     build_invitation_group_keyboard, build_main_features_keyboard, build_announcement_mgmt_message, \
-    build_announcement_delete_confirmation, build_remove_payment_keyboard
+    build_announcement_delete_confirmation, build_remove_payment_keyboard, build_participants_list
 from app.services.admin import AdminService
 from app.services.group import GroupService
 from app.services.group_permission import GroupPermissionService
@@ -442,8 +442,8 @@ async def manage_announcements(callback: CallbackQuery, callback_data: AdminCall
                                                                        limit=limit,
                                                                        with_payments=True, with_reward_groups=True,
                                                                        with_rewards=True)
-    text, keyboard = await build_announcement_mgmt_message(announcements[0], callback_data.group_id, count, offset,
-                                                           can_add_payments, can_pin_announcements)
+    text, keyboard = await build_announcement_mgmt_message(announcement=announcements[0] if announcements else None, group_id=callback_data.group_id, count=count, offset=offset,
+                                                           can_add_payments=can_add_payments, can_pin_announcements=can_pin_announcements)
     await edit_message_safely(message=callback.message, text=text, reply_markup=keyboard)
 
 
@@ -788,3 +788,13 @@ async def modify_thank_you_message(message: Message, state: FSMContext):
 
     reply = await bot.send_message(chat_id=message.chat.id, text=text, reply_markup=keyboard)
     await state.update_data(message_id=reply.message_id)
+
+@router.callback_query(AdminCallback.filter(F.action == AdminMenuAction.get_announcement_participants))
+async def get_announcement_participants(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
+    payments = await message_service.get_participants(message_id=callback_data.announcement_id, group_id=callback_data.group_id)
+    text = await build_participants_list(payments)
+    keyboard = await build_skip_button(announcement_id=callback_data.announcement_id,
+                                       group_id=callback_data.group_id,
+                                       action=AdminMenuAction.manage_announcements,
+                                       button_name="⬅️ Back")
+    await edit_message_safely(message=callback.message, text=text, reply_markup=keyboard)

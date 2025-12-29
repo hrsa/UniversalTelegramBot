@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.db.models.message import Message
 from app.db.models.payment import Payment
 from app.db.models.reward import Reward
+from app.db.models.user import User
 
 
 async def get_message(session: AsyncSession, announcement_id: int | None = None, group_id: int | None = None,
@@ -172,3 +173,17 @@ async def get_message_payments(session: AsyncSession, message_id: int) -> Sequen
     stmt = select(Payment).where(Payment.message_id == message_id)
     result = await session.execute(stmt)
     return result.scalars().all()
+
+async def get_participants(session: AsyncSession, announcement_id: int | None = None, message_id: int | None = None, group_id: int | None = None) -> Message | None:
+    stmt = (select(Message)
+            .options(selectinload(Message.payments).selectinload(Payment.user)))
+    if announcement_id:
+        stmt = stmt.where(Message.id == announcement_id)
+    elif message_id and group_id:
+        stmt = stmt.where(Message.message_id == message_id).where(Message.group_id == group_id)
+    else:
+        return None
+
+
+    result = await session.execute(stmt)
+    return result.scalars().one_or_none()

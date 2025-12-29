@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Sequence
+from typing import Sequence, cast
 
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from loguru import logger
@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped
 
 from app.bot.core import bot
 from app.db.models.message import Message
+from app.db.models.payment import Payment
 from app.db.repositories import message as message_repo
 from app.db.repositories import payment as payment_repo
 from app.db.repositories import reward as reward_repo
@@ -59,16 +60,6 @@ class MessageService:
     async def unpin_message(self, group_id: int, message_id: int):
         async with self.session() as session:
             message = await message_repo.pin_message(session, group_id=group_id, message_id=message_id, unpin=True)
-        return message
-
-    async def watch_message(self, group_id: int, message_id: int):
-        async with self.session() as session:
-            message = await message_repo.watch_message(session, group_id=group_id, message_id=message_id)
-        return message
-
-    async def unwatch_message(self, group_id: int, message_id: int):
-        async with self.session() as session:
-            message = await message_repo.watch_message(session, group_id=group_id, message_id=message_id, unwatch=True)
         return message
 
     async def is_pinned(self, group_id: int, message_id: int) -> bool:
@@ -130,6 +121,11 @@ class MessageService:
         early_bird_limit = int(message.participants_limit * 0.3 + 0.5)
 
         return message.early_bird_stripe_product_id if early_bird_limit <= payment_count else message.stripe_product_id
+
+    async def get_participants(self, announcement_id: int | None = None, message_id: int | None = None, group_id: int | None = None) -> Sequence[Payment] | None:
+        async with self.session() as session:
+            message = await message_repo.get_participants(session, announcement_id=announcement_id, message_id=message_id, group_id=group_id)
+            return cast(Sequence[Payment], message.payments) if message is not None else None
 
     async def add_button_to_announcement(self, group_id: int, message_id: int, button_text: str,
                                          action: AnnouncementAction = AnnouncementAction.join,

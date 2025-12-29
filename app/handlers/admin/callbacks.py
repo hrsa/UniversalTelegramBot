@@ -38,6 +38,7 @@ class AdminMenuAction(str, Enum):
     set_new_invitation_group = 'ngi'
     confirm_announcement = 'ca'
     confirm_delete_announcement = 'cda'
+    get_announcement_participants = 'gap'
     delete_announcement = 'da'
     confirm_pin = 'cp'
     set_greeting_message = 'sgm'

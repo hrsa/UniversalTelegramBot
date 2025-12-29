@@ -44,7 +44,16 @@ class PaymentService:
             payment_link = await self.stripe_service.create_payment_link(user_id=user_id, product_id=stripe_product_id)
             amount = await self.stripe_service.get_price(stripe_product_id)
 
-            logger.warning(payment_link)
+            existing_payment = await payment_repo.get_payment(session, user_id=user_id, message_id=announcement.id)
+
+            if existing_payment is not None:
+                payment = await payment_repo.update_payment(session=session, payment_id=existing_payment.id,
+                                                            stripe_payment_id=payment_link.id,
+                                                            stripe_product_id=stripe_product_id,
+                                                            created_at=datetime.now(),
+                                                            status=status if status is not None else "pending",
+                                                            url=payment_link.url, amount=amount)
+                return payment
 
             payment = await payment_repo.create_payment(session, user_id=user_id, message_id=announcement.id,
                                                         stripe_payment_id=payment_link.id,
@@ -76,11 +85,11 @@ class PaymentService:
         async with self.session() as session:
             return await payment_repo.get_payment_count(session=session, announcement_id=announcement_id, status=status)
 
-    async def verify_event_capacity(self, announcement_id: int):
+    async def verify_event_capacity(self, announcement_id: int) -> tuple[bool, int]:
         announcement = await self.message_service.get_message(announcement_id=announcement_id)
         confirmed = await self.get_payment_count(announcement_id, "paid")
         pending = await self.get_payment_count(announcement_id, "pending")
         limit = announcement.participants_limit
-        is_full = limit and (confirmed + pending) >= limit
+        is_full = (limit is not None) and (confirmed + pending) >= limit
 
         return is_full, pending

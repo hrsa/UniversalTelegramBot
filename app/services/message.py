@@ -4,12 +4,22 @@ from typing import Sequence
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from loguru import logger
 from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.orm import Mapped
 
 from app.bot.core import bot
 from app.db.models.message import Message
 from app.db.repositories import message as message_repo
 from app.db.repositories import payment as payment_repo
+from app.db.repositories import reward as reward_repo
 from app.handlers.admin.callbacks import AnnouncementCallback, AnnouncementAction
+
+
+async def get_payment_counts(announcement: Message) -> tuple[int, int, int, int]:
+    pending_payments_count = len(list(filter(lambda payment: payment.status == "pending", announcement.payments)))
+    waiting_payments_count = len(list(filter(lambda payment: payment.status == "waiting", announcement.payments)))
+    confirmed_payments_count = len(list(filter(lambda payment: payment.status == "paid", announcement.payments)))
+    expired_payments_count = len(list(filter(lambda payment: payment.status == "expired", announcement.payments)))
+    return confirmed_payments_count, expired_payments_count, pending_payments_count, waiting_payments_count
 
 
 class MessageService:
@@ -25,13 +35,16 @@ class MessageService:
                                                      with_reward_groups=with_reward_groups, with_payments=with_payments)
         return message
 
-    async def create_message(self, group_id: int, message_id: int, is_watched: bool | None = None,
+    async def create_message(self, group_id: int, message_id: int,
                              is_pinned: bool | None = None, text: str | None = None,
-                             stripe_product_id: str | None = None):
+                             stripe_product_id: str | None = None, early_bird_stripe_product_id: str | None = None,
+                             participants_limit: int | None = None):
         async with self.session() as session:
             message = await message_repo.create_message(session, group_id=group_id, message_id=message_id,
-                                                        is_watched=is_watched, is_pinned=is_pinned, text=text,
-                                                        stripe_product_id=stripe_product_id)
+                                                        is_pinned=is_pinned, text=text,
+                                                        stripe_product_id=stripe_product_id,
+                                                        early_bird_stripe_product_id=early_bird_stripe_product_id,
+                                                        participants_limit=participants_limit)
         return message
 
     async def get_expired_messages(self) -> Sequence[Message]:
@@ -57,12 +70,6 @@ class MessageService:
         async with self.session() as session:
             message = await message_repo.watch_message(session, group_id=group_id, message_id=message_id, unwatch=True)
         return message
-
-    async def is_watched(self, group_id: int, message_id: int) -> bool:
-        message = await self.get_message(group_id=group_id, message_id=message_id)
-        if message is None:
-            raise ValueError(f"Message with id {message_id} not found in group {group_id}")
-        return message.is_watched
 
     async def is_pinned(self, group_id: int, message_id: int) -> bool:
         message = await self.get_message(group_id=group_id, message_id=message_id)
@@ -93,16 +100,28 @@ class MessageService:
                                               payment_expires_at=expiration_date)
 
     async def set_participants_limit(self, group_id: int, message_id: int, participants_limit: int):
+        announcement = await self.get_message(group_id=group_id, message_id=message_id)
         async with self.session() as session:
-            await message_repo.update_message(session, group_id=group_id, message_id=message_id,
-                                              participants_limit=participants_limit)
+            pending_payments = await payment_repo.get_payment_count(session=session, announcement_id=announcement.id,
+                                                                    status="pending")
+            confirmed_payments = await payment_repo.get_payment_count(session=session, announcement_id=announcement.id,
+                                                                      status="paid")
+            actual_limit = pending_payments + confirmed_payments
+            if participants_limit < actual_limit:
+                raise ValueError(f"You cannot set the participants limit to be lower than {actual_limit}.\n"
+                                 f"There are {pending_payments} pending participants and {confirmed_payments} confirmed participants")
+            else:
+                await message_repo.update_message(session, group_id=group_id, message_id=message_id,
+                                                  participants_limit=participants_limit)
 
     async def get_product_id(self, group_id: int, message_id: int) -> str | None:
         message = await self.get_message(group_id=group_id, message_id=message_id)
         if message is None:
             raise ValueError(f"Message with id {message_id} not found in group {group_id}")
+        if message.stripe_product_id is None:
+            raise ValueError(f"Stripe product id for message {message_id} not found")
 
-        if message.participants_limit is None:
+        if message.participants_limit is None or message.early_bird_stripe_product_id is None:
             return message.stripe_product_id
 
         async with self.session() as session:
@@ -145,3 +164,31 @@ class MessageService:
                                                 reply_markup=builder.as_markup())
         except Exception as e:
             logger.error(e)
+
+    async def remove_payment_product(self, group_id: int | Mapped[int] | None = None, message_id: int | Mapped[int] | None = None,
+                                     announcement_id: int | Mapped[int] | None = None):
+        message = await self.get_message(group_id=group_id, message_id=message_id, announcement_id=announcement_id, with_payments=True, with_rewards=True)
+        if message is None:
+            raise ValueError(f"Announcement with id {announcement_id}, message_id {message_id} not found in group {group_id}")
+        async with self.session() as session:
+            if message.payments:
+                confirmed, expired, pending, waiting = await get_payment_counts(message)
+                if confirmed + pending + waiting > 0:
+                    raise ValueError("You cannot remove the payment product because there are payments associated with it.")
+                else:
+                    for payment in message.payments:
+                            await payment_repo.delete_payment(session, payment.id)
+            if message.reward:
+                await reward_repo.delete_reward(session, reward_id=message.reward.id)
+
+            await message_repo.remove_payment_product(session, announcement_id=message.id, early_bird_only=False)
+
+
+    async def remove_early_bird_payment_product(self, group_id: int | Mapped[int] | None = None, message_id: int | Mapped[int] | None = None,
+                                     announcement_id: int | Mapped[int] | None = None):
+        message = await self.get_message(group_id=group_id, message_id=message_id, announcement_id=announcement_id, with_payments=True, with_rewards=True)
+        if message is None:
+            raise ValueError(f"Announcement with id {announcement_id}, message_id {message_id} not found in group {group_id}")
+
+        async with self.session() as session:
+            await message_repo.remove_payment_product(session, announcement_id=message.id, early_bird_only=True)

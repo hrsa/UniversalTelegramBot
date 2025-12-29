@@ -404,7 +404,7 @@ async def build_participants_list(payments: Sequence[Payment]) -> str:
             continue
         name = payment.user.full_name if payment.user.full_name else " "
         username = f"@{payment.user.username}" if payment.user.username else ""
-        text += f"{i}) {name} ({username}) - {payment.status}\n"
+        text += f"{i}) {name} ({username}) - {payment.status} {payment.amount / 100}€\n"
         i += 1
 
     return text

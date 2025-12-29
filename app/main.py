@@ -85,7 +85,8 @@ async def stripe_webhook(request: Request):
         if event.type == "checkout.session.completed":
             user_id = event.data.object.metadata.get("user_id", None)
             payment_id = event.data.object.payment_link
-            await emit_event("payment_received", PaymentReceivedEvent(user_id=user_id, payment_link_id=payment_id))
+            amount = event.data.object.amount_total
+            await emit_event("payment_received", PaymentReceivedEvent(user_id=user_id, payment_link_id=payment_id, amount=amount))
             logger.warning(event)
     except ValueError:
         logger.error("Error while decoding event")

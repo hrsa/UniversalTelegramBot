@@ -49,7 +49,8 @@ class StripePaymentService:
             ],
             "metadata": {
                 "user_id": str(user_id),
-            }
+            },
+            "allow_promotion_codes": True,
         })
         logger.info(payment_link)
 

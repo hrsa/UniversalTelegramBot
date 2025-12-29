@@ -23,7 +23,8 @@ stripe_service = StripePaymentService()
 @broker.subscriber("events.payment_received")
 async def on_payment_received(event: PaymentReceivedEvent):
     user = await user_service.get_or_create_user(user_id=event.user_id)
-    payment = await payment_service.update_payment(stripe_payment_id=event.payment_link_id, status="paid", claimed_at=datetime.now(timezone.utc))
+    payment = await payment_service.update_payment(stripe_payment_id=event.payment_link_id, status="paid",
+                                                   amount=event.amount, claimed_at=datetime.now(timezone.utc))
     await stripe_service.disable_payment_link(event.payment_link_id)
 
     reward = await reward_service.get_reward(announcement_id=payment.message_id)

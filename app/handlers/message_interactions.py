@@ -53,30 +53,31 @@ async def on_join_announcement(callback: CallbackQuery, callback_data: Announcem
         return None
 
     if announcement.is_expired:
-        reply_text += "Sorry, this event is in the past. You can't join it anymore."
+        reply_text += f"Sorry, <b>'{callback_data.event_name}'</b> has already ended. You can't join it anymore."
         await notify_user(user_id=callback.from_user.id,
                           message=reply_text)
         return await message_service.remove_button_from_announcement(announcement.group_id, announcement.message_id)
 
     payment = await payment_service.get_payment(user_id=callback.from_user.id, announcement_id=announcement.id)
     if payment and payment.status == "paid":
-        reply_text = "You've already paid for this event!"
+        reply_text = f"You've already joined and paid for <b>'{callback_data.event_name}'</b>!"
         return await notify_user(user_id=callback.from_user.id, message=reply_text)
 
     is_full, pending = await payment_service.verify_event_capacity(announcement.id)
     if is_full and pending == 0:
-        reply_text += "Sorry, this event is full and has no pending participants! Please join the next one."
+        reply_text += f"Sorry, <b>'{callback_data.event_name}'</b> is full and has no pending participants! Please join the next one."
         return await notify_user(user_id=callback.from_user.id, message=reply_text)
     if is_full and pending > 0:
-        payment = await payment_service.create_payment(group_id=announcement.group_id,
+        await payment_service.create_payment(group_id=announcement.group_id,
                                                        message_id=announcement.message_id,
                                                        user_id=callback.from_user.id, status="waiting")
-        reply_text += (f"Sorry, this event is currently full.\n\nThere are {pending} participants who haven't paid yet."
+        reply_text += (f"Sorry, <b>'{callback_data.event_name}'</b> is currently full.\n\nThere are {pending} participants who haven't paid yet."
                        f"If they don't pay in the next 15 minutes, i'll give their place to you!")
         return await notify_user(user_id=callback.from_user.id,
                                  message=reply_text)
-    if not payment:
-        payment = await payment_service.create_payment(group_id=announcement.group_id,
+
+
+    payment = await payment_service.create_payment(group_id=announcement.group_id,
                                                        message_id=announcement.message_id,
                                                        user_id=callback.from_user.id, status="pending")
     reply_text += (f"Thank you for joining {callback_data.event_name}!\n\n"
@@ -108,8 +109,6 @@ async def watch_reactions(event: MessageReactionUpdated):
     )
 
     announcement = await message_service.get_message(group_id=event.chat.id, message_id=event.message_id)
-    if announcement and announcement.is_watched:
-        logger.info("Message is watched, Nice!!")
 
     logger.info("OLD reactions: {}", sorted(old_set) if old_set else "∅")
     logger.info("NEW reactions: {}", sorted(new_set) if new_set else "∅")

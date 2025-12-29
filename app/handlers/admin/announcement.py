@@ -71,7 +71,7 @@ async def send_announcement(callback: CallbackQuery, callback_data: AdminCallbac
         await callback.answer("Failed to send announcement. Please try again later.")
         return
     saved_announcement = await message_service.create_message(group_id=group_id, message_id=announcement.message_id,
-                                                              text=announcement_text, is_watched=True, is_pinned=False)
+                                                              text=announcement_text, is_pinned=False)
     if can_add_payments:
         await state.set_state(Announcement.adding_payment_product)
         await state.update_data(message_id=callback.message.message_id, announcement_id=saved_announcement.message_id,

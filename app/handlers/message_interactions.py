@@ -1,9 +1,12 @@
+from typing import cast
+
 from aiogram import Router, F
 from aiogram.types import MessageReactionUpdated, ReactionTypeEmoji, ReactionTypeUnion, CallbackQuery
 from loguru import logger
 
 from app.db.session import async_session_maker
 from app.handlers.admin.callbacks import AnnouncementCallback, AnnouncementAction
+from app.schemas.literals import GroupType
 from app.services.group import GroupService
 from app.services.group_member import GroupMemberService
 from app.services.message import MessageService
@@ -33,7 +36,12 @@ def _reaction_to_str(r: ReactionTypeUnion) -> str:
 
 @router.callback_query(AnnouncementCallback.filter(F.action == AnnouncementAction.join))
 async def on_join_announcement(callback: CallbackQuery, callback_data: AnnouncementCallback):
-    await group_member_service.get_or_create_member(group_id=callback.message.chat.id, user_id=callback.from_user.id,
+    group_type = cast(GroupType, callback.message.chat.type) if callback.message.chat.type is not None else None
+
+    await group_member_service.get_or_create_member(group_id=callback.message.chat.id,
+                                                    group_title=callback.message.chat.title,
+                                                    group_type=group_type,
+                                                    user_id=callback.from_user.id,
                                                     first_name=callback.from_user.first_name,
                                                     last_name=callback.from_user.last_name,
                                                     username=callback.from_user.username,

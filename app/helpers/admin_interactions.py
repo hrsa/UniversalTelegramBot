@@ -182,6 +182,8 @@ async def build_announcement_mgmt_message(announcement: Message, group_id: int, 
                                                    group_id=group_id).pack())
         return text, builder.as_markup()
     text = await build_announcement_data(announcement)
+    confirmed, expired, pending, waiting = await get_payment_counts(announcement)
+    no_current_payments = confirmed + pending + waiting == 0
     button_count = 0
     if offset > 0:
         button_count += 1
@@ -203,7 +205,7 @@ async def build_announcement_mgmt_message(announcement: Message, group_id: int, 
                                                    ).pack())
     if can_add_payments:
         await add_payment_buttons(builder, announcement, group_id)
-    if not announcement.payments or len(announcement.payments) == 0:
+    if (not announcement.payments or no_current_payments) and announcement.can_be_deleted:
         builder.button(text="Delete 🗑️",
                        callback_data=AdminCallback(level=2, action=AdminMenuAction.delete_announcement,
                                                    announcement_offset=offset,

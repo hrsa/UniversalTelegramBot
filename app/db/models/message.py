@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 
 from sqlalchemy import BigInteger, TIMESTAMP, func, Boolean, ForeignKey, String
@@ -37,6 +37,10 @@ class Message(Base):
     @hybrid_property
     def is_expired(self) -> bool:
         return self.payment_expires_at is not None and self.payment_expires_at < datetime.now(timezone.utc)
+
+    @hybrid_property
+    def can_be_deleted(self) -> bool:
+        return self.created_at is not None and self.created_at > datetime.now(timezone.utc) - timedelta(hours=48)
 
     group: Mapped["Group"] = relationship("Group", back_populates="messages")
     payments: Mapped[Optional[List["Payment"]]] = relationship("Payment", back_populates="message")

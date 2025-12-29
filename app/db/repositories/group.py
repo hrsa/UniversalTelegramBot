@@ -134,7 +134,7 @@ async def get_groups_eligible_for_invitation(session: AsyncSession, user_id: int
             .where((Group.members.any(user_id=user_id))
                    &
                    (Group.members.any(is_active_admin=True)))
-            .where(Group.permissions.any(can_invite_users=True))
+            .where(Group.permissions.has(can_invite_users=True))
             )
     result = await session.execute(stmt)
     groups = result.scalars().all()

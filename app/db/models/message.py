@@ -20,8 +20,6 @@ class Message(Base):
 
     is_pinned: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    is_watched: Mapped[bool] = mapped_column(Boolean, default=False)
-
     text: Mapped[str | None] = mapped_column(String, nullable=True)
 
     stripe_product_id: Mapped[str | None] = mapped_column(String, nullable=True)

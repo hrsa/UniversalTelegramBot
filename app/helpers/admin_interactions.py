@@ -4,6 +4,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import InlineKeyboardMarkup, MaybeInaccessibleMessageUnion
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from loguru import logger
+from sqlalchemy.orm import Mapped
 
 from app.bot.core import bot
 from app.db.models.group import Group
@@ -12,6 +13,7 @@ from app.handlers.admin.callbacks import AdminCallback, AdminMenuAction, GroupFe
 from app.schemas.group_features import ChannelFeatures, GroupFeatures
 from app.schemas.literals import RewardType
 from app.services.group import GroupService
+from app.services.message import get_payment_counts
 
 
 async def edit_message_safely(message: MaybeInaccessibleMessageUnion, text: str,
@@ -24,7 +26,8 @@ async def edit_message_safely(message: MaybeInaccessibleMessageUnion, text: str,
             pass
         else:
             logger.error(e)
-            raise
+    except Exception as e:
+        logger.error(f"Failed to edit message {message.message_id}: {e}")
 
 
 async def delete_messages_safely(chat_id: int, message_ids: Sequence[int]):
@@ -33,7 +36,6 @@ async def delete_messages_safely(chat_id: int, message_ids: Sequence[int]):
             await bot.delete_message(chat_id=chat_id, message_id=message_id)
         except Exception as e:
             logger.error(f"Failed to delete message {message_id} in chat {chat_id}: {e}")
-            continue
 
 
 async def build_group_selection_keyboard(groups: Sequence[Group]) -> InlineKeyboardMarkup:
@@ -168,19 +170,18 @@ async def build_confirm_pin_keyboard(group_id: int, announcement_id: int) -> Inl
     return builder.as_markup()
 
 
-async def build_announcement_mgmt_message(announcements: Sequence[Message], group_id: int, count: int,
-                                          offset: int) -> tuple[str, InlineKeyboardMarkup]:
+async def build_announcement_mgmt_message(announcement: Message, group_id: int, count: int,
+                                          offset: int, can_add_payments: bool | None = False,
+                                          can_pin_announcements: bool | None = False) -> tuple[
+    str, InlineKeyboardMarkup]:
     builder = InlineKeyboardBuilder()
-
-    if not announcements:
+    if not announcement:
         text = "No announcements yet."
         builder.button(text="⬅️ Back",
                        callback_data=AdminCallback(level=2, action=AdminMenuAction.back,
                                                    group_id=group_id).pack())
         return text, builder.as_markup()
-    current_announcement = announcements[0]
-    creation_date = current_announcement.created_at.strftime("%d.%m.%Y - %H:%M")
-    text = f"{creation_date}\n\n{current_announcement.text}"
+    text = await build_announcement_data(announcement)
     button_count = 0
     if offset > 0:
         button_count += 1
@@ -193,25 +194,22 @@ async def build_announcement_mgmt_message(announcements: Sequence[Message], grou
                                                               announcement_offset=offset + 1,
                                                               group_id=group_id
                                                               ).pack())
-    builder.button(text="Un-pin 📌" if current_announcement.is_pinned else "Pin 📌",
-                   callback_data=AdminCallback(level=2, action=AdminMenuAction.confirm_pin,
-                                               announcement_offset=offset,
-                                               announcement_id=current_announcement.message_id,
-                                               group_id=group_id
-                                               ).pack())
-    builder.button(text="Un-watch 👀" if current_announcement.is_watched else "Watch 👀",
-                   callback_data=AdminCallback(level=2, action=AdminMenuAction.confirm_watch,
-                                               announcement_offset=offset,
-                                               announcement_id=current_announcement.message_id,
-                                               group_id=group_id
-                                               ).pack())
-
-    builder.button(text="Delete 🗑️",
-                   callback_data=AdminCallback(level=2, action=AdminMenuAction.delete_announcement,
-                                               announcement_offset=offset,
-                                               announcement_id=current_announcement.message_id,
-                                               group_id=group_id
-                                               ).pack())
+    if can_pin_announcements:
+        builder.button(text="Un-pin 📌" if announcement.is_pinned else "Pin 📌",
+                       callback_data=AdminCallback(level=2, action=AdminMenuAction.confirm_pin,
+                                                   announcement_offset=offset,
+                                                   announcement_id=announcement.message_id,
+                                                   group_id=group_id
+                                                   ).pack())
+    if can_add_payments:
+        await add_payment_buttons(builder, announcement, group_id)
+    if not announcement.payments or len(announcement.payments) == 0:
+        builder.button(text="Delete 🗑️",
+                       callback_data=AdminCallback(level=2, action=AdminMenuAction.delete_announcement,
+                                                   announcement_offset=offset,
+                                                   announcement_id=announcement.message_id,
+                                                   group_id=group_id
+                                                   ).pack())
 
     builder.button(text="⬅️ Back",
                    callback_data=AdminCallback(level=2, action=AdminMenuAction.back,
@@ -223,12 +221,61 @@ async def build_announcement_mgmt_message(announcements: Sequence[Message], grou
     return text, builder.as_markup()
 
 
+async def add_payment_buttons(builder: InlineKeyboardBuilder, announcement: Message, group_id: int):
+    confirmed, expired, pending, waiting = await get_payment_counts(announcement)
+    no_current_payments = confirmed + pending + waiting == 0
+    if announcement.stripe_product_id:
+        builder.button(text="Modify expiration date" if announcement.payment_expires_at else "Set expiration date",
+                       callback_data=AdminCallback(level=2, action=AdminMenuAction.modify_expiration_date,
+                                                   announcement_id=announcement.message_id, group_id=group_id).pack())
+        builder.button(text="Modify max participants",
+                       callback_data=AdminCallback(level=2, action=AdminMenuAction.modify_max_participants,
+                                                   announcement_id=announcement.message_id, group_id=group_id).pack())
+        builder.button(text="Modify button name",
+                       callback_data=AdminCallback(level=2, action=AdminMenuAction.modify_callback_button_title,
+                                                   announcement_id=announcement.message_id, group_id=group_id).pack())
+        if (not announcement.payments) or (announcement.payments and no_current_payments):
+            builder.button(text="Modify reward type",
+                           callback_data=AdminCallback(level=2, action=AdminMenuAction.modify_reward_type,
+                                                       announcement_id=announcement.message_id,
+                                                       group_id=group_id).pack())
+        if announcement.reward and announcement.reward.type == "invite" and no_current_payments:
+            builder.button(text="Modify invitation group",
+                           callback_data=AdminCallback(level=2, action=AdminMenuAction.modify_invitation_group,
+                                                       announcement_id=announcement.message_id,
+                                                       group_id=group_id).pack())
+
+        if announcement.reward:
+            builder.button(text="Modify \"Thank you\" message" if announcement.reward.thank_you else "Add \"Thank you\" message",
+                           callback_data=AdminCallback(level=2, action=AdminMenuAction.modify_thank_you_message,
+                                                       announcement_id=announcement.message_id,
+                                                       group_id=group_id).pack())
+
+    if announcement.stripe_product_id is None:
+        builder.button(text="Add payment",
+                       callback_data=AdminCallback(level=2, action=AdminMenuAction.add_payment_product,
+                                                   announcement_id=announcement.message_id,
+                                                   group_id=group_id).pack())
+    elif announcement.payments and no_current_payments:
+        builder.button(text="Remove payment",
+                       callback_data=AdminCallback(level=2, action=AdminMenuAction.remove_payment_product,
+                                                   announcement_id=announcement.message_id,
+                                                   group_id=group_id).pack())
+    if announcement.stripe_product_id and announcement.early_bird_stripe_product_id is None:
+        builder.button(text="Add early bird payment",
+                       callback_data=AdminCallback(level=2, action=AdminMenuAction.modify_early_bird_payment_product,
+                                                   announcement_id=announcement.message_id,
+                                                   group_id=group_id).pack())
+    if announcement.early_bird_stripe_product_id:
+        builder.button(text="Remove early bird payment",
+                       callback_data=AdminCallback(level=2, action=AdminMenuAction.remove_early_bird_payment_product,
+                                                   announcement_id=announcement.message_id, group_id=group_id).pack())
+
+
 async def build_announcement_delete_confirmation(announcement: Message, offset: int) -> tuple[
     str, InlineKeyboardMarkup]:
     builder = InlineKeyboardBuilder()
-    creation_date = announcement.created_at.strftime("%d.%m.%Y - %H:%M")
-    expiration_date = announcement.payment_expires_at.strftime("%d.%m.%Y") if announcement.payment_expires_at else None
-    text = f"Are you sure you want to delete the announcement?\n\n{creation_date}\n\n{announcement.text}\n\nPayment expiration date: {expiration_date if expiration_date else 'N/A'}"
+    text = await build_announcement_data(announcement, header="Are you sure you want to delete the announcement?")
 
     builder.button(text="⬅️ Back",
                    callback_data=AdminCallback(level=2, action=AdminMenuAction.back,
@@ -246,6 +293,39 @@ async def build_announcement_delete_confirmation(announcement: Message, offset: 
     return text, builder.as_markup()
 
 
+async def build_announcement_data(announcement: Message, header: str | None = None) -> str:
+    creation_date = announcement.created_at.strftime("%d.%m.%Y - %H:%M")
+    expiration_date = announcement.payment_expires_at.strftime("%d.%m.%Y") if announcement.payment_expires_at else None
+    pin = "📌" if announcement.is_pinned else ""
+    text = f"{header}\n\n" if header else ""
+    text += (f"{pin}\n\n"
+             f"{creation_date}\n"
+             f"{announcement.text}\n\n")
+    if expiration_date:
+        text += f"<b>Payment expiration date</b>: {expiration_date if expiration_date else 'N/A'}"
+    text += f"\n<b>Max participants</b>: {announcement.participants_limit if announcement.participants_limit else 'Unlimited'}"
+    if announcement.stripe_product_id:
+        text += f"\n<b>Stripe product ID</b>: {announcement.stripe_product_id}"
+    if announcement.early_bird_stripe_product_id:
+        text += f"\n<b>Early bird Stripe product ID</b>: {announcement.early_bird_stripe_product_id}"
+
+    if announcement.reward:
+        text += f"\n\n<b>Reward</b>: {announcement.reward.type.capitalize()}"
+        if announcement.reward.group:
+            text += f" to '<b>{announcement.reward.group.title}</b>'"
+        text += f"\n<b>'Thank you' message</b>: \"{announcement.reward.thank_you}\""
+    if announcement.payments:
+        confirmed, expired, pending, waiting = await get_payment_counts(
+            announcement)
+
+        text += (f"\n\n<b>Participants</b>:"
+                 f"\n - {confirmed} confirmed"
+                 f"\n - {pending} pending"
+                 f"\n - {waiting} waiting"
+                 f"\n - {expired} expired")
+    return text
+
+
 async def build_skip_button(announcement_id: int, group_id: int, action: AdminMenuAction,
                             button_name: str | None = None) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
@@ -258,7 +338,7 @@ async def build_skip_button(announcement_id: int, group_id: int, action: AdminMe
     return builder.as_markup()
 
 
-async def build_reward_type_keyboard(announcement_id: int, group_id: int) -> InlineKeyboardMarkup:
+async def build_reward_type_keyboard(announcement_id: int, group_id: int, modify: bool = False) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
 
     for reward_type in get_args(RewardType):
@@ -266,18 +346,42 @@ async def build_reward_type_keyboard(announcement_id: int, group_id: int) -> Inl
                        callback_data=AdminCallback(level=2, action=AdminMenuAction.set_reward_type,
                                                    announcement_id=announcement_id, group_id=group_id,
                                                    reward_type=reward_type).pack())
+    if modify:
+        builder.button(text="⬅️ Back",
+                       callback_data=AdminCallback(level=2, action=AdminMenuAction.manage_announcements,
+                                                   announcement_id=announcement_id,
+                                                   group_id=group_id).pack())
+        builder.adjust(2, 1)
 
     return builder.as_markup()
 
-async def build_invitation_group_keyboard(groups: Sequence[Group]) -> InlineKeyboardMarkup:
+
+async def build_invitation_group_keyboard(groups: Sequence[Group], modify: bool = False) -> InlineKeyboardMarkup:
     if len(groups) == 0:
         return InlineKeyboardMarkup(inline_keyboard=[])
 
     builder = InlineKeyboardBuilder()
     for group in groups:
         builder.button(text=group.title,
-                       callback_data=AdminCallback(level=2, action=AdminMenuAction.set_invitation_group,
+                       callback_data=AdminCallback(level=2,
+                                                   action=AdminMenuAction.set_new_invitation_group if modify else AdminMenuAction.set_invitation_group,
                                                    group_id=group.id).pack())
 
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+async def build_remove_payment_keyboard(announcement_id: int | Mapped[int], group_id: int | Mapped[int],
+                                        early_bird_only: bool = False) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    text = "⛔ I understand. Remove early bird payment ⛔" if early_bird_only else "⛔ I understand. Remove payment ⛔"
+    builder.button(text="⬅️ Back",
+                   callback_data=AdminCallback(level=2, action=AdminMenuAction.manage_announcements,
+                                               announcement_id=announcement_id,
+                                               group_id=group_id).pack())
+    builder.button(text=text,
+                   callback_data=AdminCallback(level=2,
+                                               action=AdminMenuAction.confirm_remove_early_bird_payment_product if early_bird_only else AdminMenuAction.confirm_remove_payment_product,
+                                               announcement_id=announcement_id, group_id=group_id).pack())
     builder.adjust(1)
     return builder.as_markup()

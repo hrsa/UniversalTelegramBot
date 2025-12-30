@@ -8,8 +8,8 @@ from loguru import logger
 from app.bot.core import bot
 from app.config import settings
 from app.db.session import async_session_maker
-from app.handlers.admin.callbacks import AdminCallback, AdminMenuAction
-from app.handlers.admin.states import Announcement
+from app.schemas.callbacks import AdminCallback, AdminMenuAction
+from app.schemas.states import Announcement
 from app.helpers.admin_interactions import edit_message_safely, delete_messages_safely, build_skip_button, \
     build_reward_type_keyboard, \
     build_invitation_group_keyboard, build_announcement_mgmt_message, \

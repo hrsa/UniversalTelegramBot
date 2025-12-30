@@ -6,8 +6,8 @@ from aiogram.types import CallbackQuery, Message
 from app.bot.core import bot
 from app.config import settings
 from app.db.session import async_session_maker
-from app.handlers.admin.states import AdminPanel, GreetingWatch
-from app.handlers.admin.callbacks import AdminCallback, AdminMenuAction
+from app.schemas.states import AdminPanel, GreetingWatch
+from app.schemas.callbacks import AdminCallback, AdminMenuAction
 from app.helpers.admin_interactions import build_main_features_keyboard, build_greeting_watch_keyboard, \
     build_group_selection_keyboard, edit_message_safely
 from app.services.admin import AdminService

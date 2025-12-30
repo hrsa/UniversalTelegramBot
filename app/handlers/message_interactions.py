@@ -5,7 +5,7 @@ from aiogram.types import MessageReactionUpdated, ReactionTypeEmoji, ReactionTyp
 from loguru import logger
 
 from app.db.session import async_session_maker
-from app.handlers.admin.callbacks import AnnouncementCallback, AnnouncementAction
+from app.schemas.callbacks import AnnouncementCallback, AnnouncementAction
 from app.schemas.literals import GroupType
 from app.services.group import GroupService
 from app.services.group_member import GroupMemberService

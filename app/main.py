@@ -1,17 +1,13 @@
-import sys
 from contextlib import asynccontextmanager
 
-from aiogram.types import Update
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI
 from loguru import logger
-from stripe import Webhook, SignatureVerificationError
 
 from app.bot.core import dp, bot
 from app.config import settings
-from app.events.emitter import redis_broker, emit_event
+from app.events.emitter import redis_broker
 from app.events.listeners import all_listeners
-from app.events.schemas import PaymentReceivedEvent
-from app.handlers import all_routers
+from app.handlers import all_routers, api_routers
 from app.scheduler.setup import setup_scheduler, scheduler
 
 
@@ -22,12 +18,17 @@ async def lifespan(app: FastAPI):
     await redis_broker.start()
     setup_scheduler()
     await bot.set_webhook(url=f"https://{settings.DOMAIN}/{settings.WEBHOOK_URL}", secret_token=settings.WEBHOOK_SECRET,
-                          allowed_updates=["message", "edited_message", "channel_post", "edited_channel_post", "business_connection",
-                                           "business_message", "edited_business_message", "deleted_business_message", "message_reaction",
-                                           "message_reaction_count", "inline_query", "chosen_inline_result", "callback_query",
-                                           "shipping_query", "pre_checkout_query", "purchased_paid_media", "poll", "poll_answer",
-                                           "my_chat_member", "chat_member", "chat_join_request", "chat_boost", "removed_chat_boost"])
-    print(
+                          allowed_updates=["message", "edited_message", "channel_post", "edited_channel_post",
+                                           "business_connection",
+                                           "business_message", "edited_business_message", "deleted_business_message",
+                                           "message_reaction",
+                                           "message_reaction_count", "inline_query", "chosen_inline_result",
+                                           "callback_query",
+                                           "shipping_query", "pre_checkout_query", "purchased_paid_media", "poll",
+                                           "poll_answer",
+                                           "my_chat_member", "chat_member", "chat_join_request", "chat_boost",
+                                           "removed_chat_boost"])
+    logger.info(
         f"Webhook set to:"
         f"https://{settings.DOMAIN}/{settings.WEBHOOK_URL}"
     )
@@ -40,61 +41,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan, title="aUniversalTelegramBot")
+for router in api_routers:
+    app.include_router(router)
 for listener in all_listeners:
     app.include_router(listener)
-logger.add(sys.stdout, format="<green>{time}</green> <level>{message}</level>", level="INFO", colorize=True)
+
+# logger.add(sys.stdout, format="<green>{time}</green> <level>{message}</level>", level="INFO", colorize=True)
 logger.add("logs/bot.log", rotation="3 days", retention="12 days", colorize=True,
            format="<green>{time}</green> <level>{message}</level>")
-
-
-@app.get("/")
-async def root():
-    return {"message": "Hello World"}
-
-
-@app.post(f"/{settings.WEBHOOK_URL}")
-async def handle_update(request: Request):
-    secret_token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
-
-    if secret_token != settings.WEBHOOK_SECRET:
-        raise HTTPException(status_code=401, detail="Unauthorized, invalid secret token")
-
-    update_data = await request.json()
-    update = Update(**update_data)
-    await dp.feed_update(update=update, bot=bot)
-    try:
-        logger.info(update.model_dump_json(indent=4, exclude_none=True))
-    except Exception as e:
-        logger.warning(f"Failed to log update: {e}")
-        logger.warning(update_data)
-    return {"status": "OK"}
-
-@app.post("/stripe")
-async def stripe_webhook(request: Request):
-    headers = request.headers
-    stripe_signature = headers.get("Stripe-Signature", None)
-
-    try:
-        event = Webhook.construct_event(payload=await request.body(), sig_header=stripe_signature, secret=settings.STRIPE_SIGNING_SECRET)
-        # logger.info(event)
-        if event.type == "checkout.session.completed":
-            user_id = event.data.object.metadata.get("user_id", None)
-            payment_id = event.data.object.payment_link
-            amount = event.data.object.amount_total
-            await emit_event("payment_received", PaymentReceivedEvent(user_id=user_id, payment_link_id=payment_id, amount=amount))
-            logger.warning(event)
-    except ValueError:
-        logger.error("Error while decoding event")
-        return {"status": "Error while decoding event", "code": 400}
-    except SignatureVerificationError:
-        logger.error("Invalid signature")
-        return {"status": "Invalid signature", "code": 401}
-    return {"status": "OK"}
-
-
-@app.get("/hello/{name}")
-async def say_hello(name: str):
-    return {"message": f"Hello {name}"}
 
 
 @app.get("/health")

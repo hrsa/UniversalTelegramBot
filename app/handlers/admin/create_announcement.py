@@ -6,8 +6,8 @@ from app.bot.core import bot
 from app.config import settings
 from app.db.session import async_session_maker
 from app.handlers.admin.admin_interactions import process_group_selection
-from app.handlers.admin.callbacks import AdminCallback, AdminMenuAction
-from app.handlers.admin.states import AdminPanel, Announcement
+from app.schemas.callbacks import AdminCallback, AdminMenuAction
+from app.schemas.states import AdminPanel, Announcement
 from app.helpers.admin_interactions import edit_message_safely, build_confirm_announcement_keyboard, \
     build_confirm_pin_keyboard, delete_messages_safely, build_skip_button, build_reward_type_keyboard, \
     build_invitation_group_keyboard, build_main_features_keyboard

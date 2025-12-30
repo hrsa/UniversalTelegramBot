@@ -10,7 +10,7 @@ from app.bot.core import bot
 from app.db.models.group import Group
 from app.db.models.message import Message
 from app.db.models.payment import Payment
-from app.handlers.admin.callbacks import AdminCallback, AdminMenuAction, GroupFeature
+from app.schemas.callbacks import AdminCallback, AdminMenuAction, GroupFeature
 from app.schemas.group_features import ChannelFeatures, GroupFeatures
 from app.schemas.literals import RewardType
 from app.services.group import GroupService

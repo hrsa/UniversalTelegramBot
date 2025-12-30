@@ -12,7 +12,7 @@ from app.db.models.payment import Payment
 from app.db.repositories import message as message_repo
 from app.db.repositories import payment as payment_repo
 from app.db.repositories import reward as reward_repo
-from app.handlers.admin.callbacks import AnnouncementCallback, AnnouncementAction
+from app.schemas.callbacks import AnnouncementCallback, AnnouncementAction
 
 
 async def get_payment_counts(announcement: Message) -> tuple[int, int, int, int]:

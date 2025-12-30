@@ -48,8 +48,8 @@ async def process_group_selection(callback: CallbackQuery, callback_data: AdminC
     group_id = callback_data.group_id
     group = await group_service.get_or_create_group(group_id)
     features = await group_service.get_features(group_id)
-    keyboard = await build_main_features_keyboard(group_id, features,
-                                                  callback.from_user.id == settings.ADMIN_TELEGRAM_ID)
+    can_manage_payments = callback.from_user.id == settings.ADMIN_TELEGRAM_ID
+    keyboard = await build_main_features_keyboard(group_id, features, can_manage_payments)
 
     await edit_message_safely(message=callback.message,
                               text=f"Selected group: {group.title}. What do you want to do with it?",

@@ -1,5 +1,4 @@
 from loguru import logger
-from sqlalchemy.ext.asyncio import async_sessionmaker
 from stripe import StripeClient, InvalidRequestError
 
 from app.config import settings
@@ -52,7 +51,6 @@ class StripePaymentService:
             },
             "allow_promotion_codes": True,
         })
-        logger.info(payment_link)
 
         return payment_link
 

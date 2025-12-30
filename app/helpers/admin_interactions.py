@@ -65,15 +65,12 @@ async def build_main_features_keyboard(group_id: int, features: GroupFeatures | 
 
     for name, value in features.model_dump().items():
         button_text = name.replace("_", " ").capitalize()
-        logger.debug(f"Building keyboard for feature {name}: {value}")
-        logger.debug(f"is_creator: {is_creator}")
         if name == "greeting_watch":
             button_text = "Greeting Watch ➡️"
             action = AdminMenuAction.open_feature
         elif name == "allow_payments":
             if is_creator:
-                button_text = "Allow Payments"
-                button_text += " ✅" if value else " ❌"
+                button_text = "Disable payments" if value else "Enable Payments"
                 action = AdminMenuAction.toggle_bool
             else:
                 continue
@@ -227,7 +224,7 @@ async def build_announcement_mgmt_message(announcement: Message | None, group_id
 async def add_payment_buttons(builder: InlineKeyboardBuilder, announcement: Message, group_id: int):
     confirmed, expired, pending, waiting = await get_payment_counts(announcement)
     no_current_payments = confirmed + pending + waiting == 0
-    if announcement.payments:
+    if announcement.payments and len(announcement.payments) > 0:
         builder.button(text="Participants list",
                        callback_data=AdminCallback(level=2, action=AdminMenuAction.get_announcement_participants,
                                                    announcement_id=announcement.message_id, group_id=group_id).pack())
@@ -253,10 +250,11 @@ async def add_payment_buttons(builder: InlineKeyboardBuilder, announcement: Mess
                                                        group_id=group_id).pack())
 
         if announcement.reward:
-            builder.button(text="Modify \"Thank you\" message" if announcement.reward.thank_you else "Add \"Thank you\" message",
-                           callback_data=AdminCallback(level=2, action=AdminMenuAction.modify_thank_you_message,
-                                                       announcement_id=announcement.message_id,
-                                                       group_id=group_id).pack())
+            builder.button(
+                text="Modify \"Thank you\" message" if announcement.reward.thank_you else "Add \"Thank you\" message",
+                callback_data=AdminCallback(level=2, action=AdminMenuAction.modify_thank_you_message,
+                                            announcement_id=announcement.message_id,
+                                            group_id=group_id).pack())
 
     if announcement.stripe_product_id is None:
         builder.button(text="Add payment",
@@ -303,10 +301,8 @@ async def build_announcement_delete_confirmation(announcement: Message, offset: 
 async def build_announcement_data(announcement: Message, header: str | None = None) -> str:
     creation_date = announcement.created_at.strftime("%d.%m.%Y - %H:%M")
     expiration_date = announcement.payment_expires_at.strftime("%d.%m.%Y") if announcement.payment_expires_at else None
-    pin = "📌" if announcement.is_pinned else ""
     text = f"{header}\n\n" if header else ""
-    text += (f"{pin}\n\n"
-             f"{creation_date}\n"
+    text += (f"{creation_date}\n"
              f"{announcement.text}\n\n")
     if expiration_date:
         text += f"<b>Payment expiration date</b>: {expiration_date if expiration_date else 'N/A'}"
@@ -393,6 +389,7 @@ async def build_remove_payment_keyboard(announcement_id: int | Mapped[int], grou
     builder.adjust(1)
     return builder.as_markup()
 
+
 async def build_participants_list(payments: Sequence[Payment]) -> str:
     if len(payments) == 0:
         return "No participants yet."
@@ -408,4 +405,3 @@ async def build_participants_list(payments: Sequence[Payment]) -> str:
         i += 1
 
     return text
-

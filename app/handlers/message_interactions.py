@@ -1,7 +1,7 @@
 from typing import cast
 
 from aiogram import Router, F
-from aiogram.types import MessageReactionUpdated, ReactionTypeEmoji, ReactionTypeUnion, CallbackQuery
+from aiogram.types import MessageReactionUpdated, ReactionTypeEmoji, ReactionTypeUnion, CallbackQuery, Message
 from loguru import logger
 
 from app.db.session import async_session_maker
@@ -19,19 +19,6 @@ group_service = GroupService(async_session_maker)
 group_member_service = GroupMemberService(async_session_maker, group_service, user_service)
 message_service = MessageService(async_session_maker)
 payment_service = PaymentService(async_session_maker, message_service)
-
-
-def _reaction_to_str(r: ReactionTypeUnion) -> str:
-    """
-    Convert aiogram reaction union into a stable printable/comparable string.
-    """
-    if isinstance(r, ReactionTypeEmoji):
-        return f"emoji:{r.emoji}"
-    # Covers custom_emoji / paid / future types without crashing
-    # (model_dump exists on aiogram's pydantic models)
-    data = r.model_dump(exclude_none=True)
-    r_type = data.get("type", "unknown")
-    return f"{r_type}:{data}"
 
 
 @router.callback_query(AnnouncementCallback.filter(F.action == AnnouncementAction.join))
@@ -95,35 +82,15 @@ async def on_join_announcement(callback: CallbackQuery, callback_data: Announcem
                              message=reply_text)
 
 
-@router.message_reaction()
-async def watch_reactions(event: MessageReactionUpdated):
-    username = getattr(event.user, "username", None) or f"id:{event.user.id}"
+@router.message(F.text)
+async def add_group_member_if_necessary(message: Message):
+    group_type = cast(GroupType, message.chat.type) if message.chat.type is not None else None
 
-    old_list: list[ReactionTypeUnion] = list(event.old_reaction or [])
-    new_list: list[ReactionTypeUnion] = list(event.new_reaction or [])
-
-    old_set = {_reaction_to_str(r) for r in old_list}
-    new_set = {_reaction_to_str(r) for r in new_list}
-
-    added = sorted(new_set - old_set)
-    removed = sorted(old_set - new_set)
-    kept = sorted(new_set & old_set)
-
-    logger.info(
-        "REACTION_UPDATE chat_id={} message_id={} by={}",
-        event.chat.id,
-        event.message_id,
-        username,
-    )
-
-    announcement = await message_service.get_message(group_id=event.chat.id, message_id=event.message_id)
-
-    logger.info("OLD reactions: {}", sorted(old_set) if old_set else "∅")
-    logger.info("NEW reactions: {}", sorted(new_set) if new_set else "∅")
-
-    if added:
-        logger.info("ADDED reactions: {}", added)
-    if removed:
-        logger.info("REMOVED reactions: {}", removed)
-    if kept:
-        logger.debug("KEPT reactions: {}", kept)
+    await group_member_service.get_or_create_member(group_id=message.chat.id,
+                                                    group_title=message.chat.title,
+                                                    group_type=group_type,
+                                                    user_id=message.from_user.id,
+                                                    first_name=message.from_user.first_name,
+                                                    last_name=message.from_user.last_name,
+                                                    username=message.from_user.username,
+                                                    is_bot=message.from_user.is_bot)

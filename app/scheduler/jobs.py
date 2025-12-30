@@ -11,6 +11,7 @@ from app.services.group import GroupService
 from app.services.group_member import GroupMemberService
 from app.services.message import MessageService
 from app.services.payment import PaymentService
+from app.services.s3_backup import S3BackupService
 from app.services.stripe_payment import StripePaymentService
 from app.services.user import UserService, notify_user
 
@@ -24,6 +25,7 @@ group_member_service = GroupMemberService(
 message_service = MessageService(async_session_maker)
 payment_service = PaymentService(async_session_maker, message_service)
 stripe_service = StripePaymentService()
+s3_backup_service = S3BackupService()
 
 
 async def notify_and_kick_members_without_greetings():
@@ -81,3 +83,22 @@ async def activate_waiting_payments():
                        f"Please remember, this link is valid <b><u>only for 15 minutes</u></b>!")
             await notify_user(user_id=payment.user_id,
                               message=message)
+
+
+async def upload_backups_to_s3():
+    logger.info("Uploading backups to S3")
+
+    try:
+        stats = await s3_backup_service.process_backups()
+
+        if stats["found"] > 0:
+            logger.info(
+                f"Backup upload completed. "
+                f"Uploaded: {stats['uploaded']}/{stats['found']}, "
+                f"Failed: {stats['failed']}"
+            )
+        else:
+            logger.info("No backup files found.")
+
+    except Exception as e:
+        logger.error(f"Failed to upload backups: {e}")

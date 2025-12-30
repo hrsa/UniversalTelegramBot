@@ -35,5 +35,10 @@ def setup_scheduler():
         IntervalTrigger(minutes=1, timezone=timezone.utc)
     )
 
+    scheduler.add_job(
+        jobs.upload_backups_to_s3,
+        IntervalTrigger(days=1, timezone=timezone.utc)
+    )
+
     scheduler.start()
     return scheduler

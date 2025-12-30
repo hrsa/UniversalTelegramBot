@@ -34,3 +34,10 @@ ENV/
 
 docker/acme.json
 /traefik/acme.json
+
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/.terraform.lock.hcl
+terraform/terraform.tfvars.backup
+terraform/terraform.tfvars

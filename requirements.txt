@@ -11,3 +11,4 @@ alembic
 pydantic-settings
 loguru
 stripe
+boto3

@@ -97,12 +97,10 @@ resource "aws_iam_user_policy" "backup_policy" {
         Resource = aws_s3_bucket.backup_bucket.arn
       },
       {
-        Sid = "ManageBackupObjects"
+        Sid = "UploadBackups"
         Effect = "Allow"
         Action = [
           "s3:PutObject",
-          "s3:GetObject",
-          "s3:DeleteObject",
           "s3:PutObjectAcl"
         ]
         Resource = "${aws_s3_bucket.backup_bucket.arn}/*"
@@ -111,6 +109,15 @@ resource "aws_iam_user_policy" "backup_policy" {
             "s3:x-amz-server-side-encryption" = "AES256"
           }
         }
+      },
+      {
+        Sid = "DownloadAndDeleteBackups"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:DeleteObject"
+        ]
+        Resource = "${aws_s3_bucket.backup_bucket.arn}/*"
       }
     ]
   })

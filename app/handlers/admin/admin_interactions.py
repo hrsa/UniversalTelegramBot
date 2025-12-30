@@ -9,10 +9,11 @@ from app.db.session import async_session_maker
 from app.schemas.states import AdminPanel, GreetingWatch
 from app.schemas.callbacks import AdminCallback, AdminMenuAction
 from app.helpers.admin_interactions import build_main_features_keyboard, build_greeting_watch_keyboard, \
-    build_group_selection_keyboard, edit_message_safely
+    build_group_selection_keyboard, edit_message_safely, delete_messages_safely
 from app.services.admin import AdminService
 from app.services.group import GroupService
 from app.services.group_permission import GroupPermissionService
+from app.services.s3_backup import S3BackupService
 
 router = Router()
 group_permission_service = GroupPermissionService(async_session_maker)
@@ -43,6 +44,44 @@ async def start_command(message: Message, state: FSMContext):
     await state.set_state(AdminPanel.choosing_group)
 
 
+@router.message(Command("get_latest_backup"))
+async def restore_backup(message: Message, state: FSMContext):
+    await delete_messages_safely(message.chat.id, [message.message_id])
+    if message.from_user.id != settings.ADMIN_TELEGRAM_ID:
+        await bot.send_message(message.chat.id, "Only the admin can restore backups.")
+        return
+
+    try:
+        s3 = S3BackupService()
+        await s3.download_latest_backup()
+        await bot.send_message(message.chat.id, "Backup downloaded successfully.")
+    except Exception as e:
+        await bot.send_message(message.chat.id, f"Failed to download backup: {e}")
+
+
+@router.message(Command("run_backup"))
+async def force_backup(message: Message, state: FSMContext):
+    await delete_messages_safely(message.chat.id, [message.message_id])
+    if message.from_user.id != settings.ADMIN_TELEGRAM_ID:
+        await bot.send_message(message.chat.id, "Only the admin can run backups.")
+        return
+
+    try:
+        s3 = S3BackupService()
+        stats = await s3.process_backups()
+
+        if stats["found"] > 0:
+            await bot.send_message(message.chat.id,
+                                   f"Backup upload completed. "
+                                   f"Uploaded: {stats['uploaded']}/{stats['found']}, "
+                                   f"Failed: {stats['failed']}"
+                                   )
+        else:
+            await bot.send_message(message.chat.id, "No backup files found.")
+    except Exception as e:
+        await bot.send_message(message.chat.id, f"Failed to upload backups: {e}")
+
+
 @router.callback_query(AdminPanel.choosing_group, AdminCallback.filter(F.action == AdminMenuAction.select_group))
 async def process_group_selection(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
     group_id = callback_data.group_id
@@ -55,7 +94,6 @@ async def process_group_selection(callback: CallbackQuery, callback_data: AdminC
                               text=f"Selected group: {group.title}. What do you want to do with it?",
                               reply_markup=keyboard)
     await state.set_state(AdminPanel.managing_features)
-
 
 
 @router.callback_query(AdminCallback.filter(F.action == AdminMenuAction.toggle_bool))

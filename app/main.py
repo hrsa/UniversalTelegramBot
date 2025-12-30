@@ -4,20 +4,15 @@ from contextlib import asynccontextmanager
 from aiogram.types import Update
 from fastapi import FastAPI, Request, HTTPException
 from loguru import logger
-from stripe import Webhook, SignatureVerificationError, StripeClient
+from stripe import Webhook, SignatureVerificationError
 
-from app.config import settings
 from app.bot.core import dp, bot
-from app.db.session import async_session_maker
+from app.config import settings
 from app.events.emitter import redis_broker, emit_event
+from app.events.listeners import all_listeners
 from app.events.schemas import PaymentReceivedEvent
 from app.handlers import all_routers
-from app.events.listeners import all_listeners
-from app.handlers.admin.announcement import message_service
 from app.scheduler.setup import setup_scheduler, scheduler
-from app.services.group import GroupService
-from app.services.message import MessageService
-from app.services.stripe_payment import StripePaymentService
 
 
 @asynccontextmanager

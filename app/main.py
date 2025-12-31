@@ -1,3 +1,4 @@
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -46,9 +47,10 @@ for router in api_routers:
 for listener in all_listeners:
     app.include_router(listener)
 
-# logger.add(sys.stdout, format="<green>{time}</green> <level>{message}</level>", level="INFO", colorize=True)
-logger.add("logs/bot.log", rotation="3 days", retention="12 days", colorize=True,
-           format="<green>{time}</green> <level>{message}</level>")
+logger.add(sys.stdout, format="<green>{time}</green> <level>{message}</level>", level="INFO", colorize=True)
+if settings.ENV == "production":
+    logger.add("logs/bot.log", rotation="3 days", retention="12 days", colorize=True,
+               format="<green>{time}</green> <level>{message}</level>")
 
 
 @app.get("/health")

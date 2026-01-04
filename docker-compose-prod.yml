@@ -1,5 +1,6 @@
 volumes:
   postgres_data:
+  db_backups:
 
 services:
   traefik:
@@ -10,7 +11,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     volumes:
       - "./traefik/traefik.yml:/etc/traefik/traefik.yml"
       - "./traefik/acme.json:/acme.json"
@@ -18,19 +19,26 @@ services:
 
 
   postgres:
-    image: postgres:18.1-alpine
+    build:
+      context: .
+      dockerfile: postgres.dockerfile
     container_name: postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5432:5432"
     volumes:
       - "postgres_data:/var/lib/postgresql/data"
+      - "db_backups:/backups"
 
 
   redis:
     image: redis:8.2-alpine
     container_name: redis
+    ports:
+      - "127.0.0.1:6379:6379"
 
 
   bot:
@@ -38,18 +46,14 @@ services:
     build:
       dockerfile: bot.dockerfile
       target: prod
+    volumes:
+      - "db_backups:/backups"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.bot.rule=Host(`${DOMAIN}`)"
       - "traefik.http.routers.bot.entrypoints=websecure"
       - "traefik.http.routers.bot.tls.certresolver=myresolver"
-      - "traefik.http.services.bot.loadbalancer.server.port=80"
-    environment:
-      - BOT_TOKEN=${BOT_TOKEN}
-      - WEBHOOK_URL=${DOMAIN}
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT}
+      - "traefik.http.services.bot.loadbalancer.server.port=8081"
     depends_on:
       - postgres
       - redis

@@ -90,23 +90,8 @@ async def set_group_features(session: AsyncSession, group_id: int, features: dic
     return group
 
 
-# async def set_group_greeting(session: AsyncSession, group_id: int, hashtag: str, message: str) -> Group:
-#     group = await get_or_create_group(session, group_id)
-#
-#     group.greeting_hashtag = hashtag
-#     group.greeting_message = message
-#
-#     await session.commit()
-#     await session.refresh(group)
-#     return group
-#
-#
-# async def set_reminder_message(session: AsyncSession, group_id: int, reminder_message: str) -> Group:
-#     group = await get_or_create_group(session, group_id)
-#     group.reminder_message = reminder_message
-#     await session.commit()
-#     await session.refresh(group)
-#     return group
+async def get_locale(session: AsyncSession, group_id: int) -> str:
+    return (await session.execute(select(Group.locale).where(Group.id == group_id))).scalar_one()
 
 
 async def get_user_groups(session: AsyncSession, user_id: int) -> Sequence[Group]:

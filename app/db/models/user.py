@@ -20,6 +20,8 @@ class User(Base):
 
     last_name: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
+    locale: Mapped[str | None] = mapped_column(String(5), default="en", nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
     groups: Mapped[Optional[List["Group"]]] = relationship("GroupMember", back_populates="user", cascade="all, delete-orphan")

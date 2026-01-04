@@ -18,6 +18,8 @@ class Group(Base):
 
     title: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
+    locale: Mapped[str | None] = mapped_column(String(5), default="en", nullable=True)
+
     status: Mapped[GroupStatus | None] = mapped_column(String(50), nullable=True)
 
     features: Mapped[dict] = mapped_column(JSONB, server_default="{}", nullable=False)

@@ -12,3 +12,6 @@ pydantic-settings
 loguru
 stripe
 boto3
+python-i18n
+i18n
+pyyaml

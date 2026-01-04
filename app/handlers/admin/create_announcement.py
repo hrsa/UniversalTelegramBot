@@ -17,6 +17,7 @@ from app.services.group_permission import GroupPermissionService
 from app.services.message import MessageService
 from app.services.reward import RewardService
 from app.services.stripe_payment import StripePaymentService
+from app.services.translation import t_for
 
 router = Router()
 group_permission_service = GroupPermissionService(async_session_maker)
@@ -33,8 +34,10 @@ async def set_announcement_text(callback: CallbackQuery, callback_data: AdminCal
     group = await group_service.get_group(callback_data.group_id)
     await state.update_data(group_id=callback_data.group_id, message_id=callback.message.message_id)
     await state.set_state(Announcement.creating_announcement)
-    await edit_message_safely(message=callback.message,
-                              text=f"Please enter the <b>text</b> of the announcement for {group.title}.")
+    text = await t_for(key="admin_interactions.create_announcement.enter_text",
+                       user_id=callback.from_user.id, default_locale=callback.from_user.language_code,
+                       group_name=group.title)
+    await edit_message_safely(message=callback.message, text=text)
 
 
 @router.message(Announcement.creating_announcement, F.text)
@@ -45,7 +48,10 @@ async def show_confirmation_dialogue(message: Message, state: FSMContext):
     await delete_messages_safely(message.chat.id, [message.message_id, message_id])
 
     keyboard = await build_confirm_announcement_keyboard(group_id)
-    confirmation_text = f"Here is the announcement i'll send:\n\n{message.text}"
+    confirm_announcement_text = await t_for(key="admin_interactions.create_announcement.confirm_announcement",
+                                            user_id=message.from_user.id,
+                                            default_locale=message.from_user.language_code)
+    confirmation_text = f"{confirm_announcement_text}\n\n<b>{message.text}</b>"
 
     await bot.send_message(message.chat.id, text=confirmation_text, reply_markup=keyboard)
     await state.set_state(Announcement.confirming_announcement)
@@ -63,7 +69,10 @@ async def send_announcement(callback: CallbackQuery, callback_data: AdminCallbac
     announcement_text = await state.get_value("announcement_text")
     announcement = await bot.send_message(chat_id=group_id, text=announcement_text)
     if not announcement:
-        await callback.answer("Failed to send announcement. Please try again later.")
+        failed_to_send_text = await t_for(key="admin_interactions.create_announcement.failed_to_send_announcement",
+                                          user_id=callback.from_user.id,
+                                          default_locale=callback.from_user.language_code)
+        await callback.answer(failed_to_send_text)
         return
     saved_announcement = await message_service.create_message(group_id=group_id, message_id=announcement.message_id,
                                                               text=announcement_text, is_pinned=False)
@@ -71,25 +80,37 @@ async def send_announcement(callback: CallbackQuery, callback_data: AdminCallbac
         await state.set_state(Announcement.adding_payment_product)
         await state.update_data(message_id=callback.message.message_id, announcement_id=saved_announcement.message_id,
                                 group_id=group_id)
-        text = f"Would you like to add a payment button to this announcement?\nIf yes - please reply with the Stripe product ID you'd like to attach."
+        text = await t_for(key="admin_interactions.create_announcement.payment.add_payment_dialogue",
+                           user_id=callback.from_user.id, default_locale=callback.from_user.language_code)
+        dont_add_payment_text = await t_for(key="admin_interactions.create_announcement.buttons.dont_add_payment",
+                                            user_id=callback.from_user.id,
+                                            default_locale=callback.from_user.language_code)
         keyboard = await build_skip_button(announcement_id=saved_announcement.message_id,
-                                           group_id=saved_announcement.group_id, button_name="Don't add payment",
+                                           group_id=saved_announcement.group_id, button_name=dont_add_payment_text,
                                            action=AdminMenuAction.skip_to_pin_announcement)
         await edit_message_safely(message=callback.message, text=text, reply_markup=keyboard)
     else:
+        success_text = await t_for(key="admin_interactions.create_announcement.announcement_sent",
+                                   user_id=callback.from_user.id, default_locale=callback.from_user.language_code)
+        pin_dialogue_text = await t_for(key="admin_interactions.create_announcement.pin.pin_dialogue",
+                                        user_id=callback.from_user.id, default_locale=callback.from_user.language_code)
         if can_pin_announcements:
             await state.set_state(Announcement.confirming_pin)
             keyboard = await build_confirm_pin_keyboard(group_id=group_id,
                                                         announcement_id=saved_announcement.message_id)
             await edit_message_safely(message=callback.message,
-                                      text=f"Announcement sent successfully!\nDo you want me to pin it?",
+                                      text=f"P{success_text}\n{pin_dialogue_text}",
                                       reply_markup=keyboard)
         else:
             group = await group_service.get_group(group_id)
+            selected_group_dialogue_text = await t_for(key="admin_interactions.group_management.grou_selected",
+                                                       user_id=callback.from_user.id,
+                                                       default_locale=callback.from_user.language_code,
+                                                       title=group.title)
             features = await group_service.get_features(group_id)
             keyboard = await build_main_features_keyboard(group_id, features,
                                                           callback.from_user.id == settings.ADMIN_TELEGRAM_ID)
-            text = f"Announcement sent successfully!\n\nSelected group: {group.title}. What do you want to do with it?"
+            text = f"{success_text}\n\n{selected_group_dialogue_text}"
 
             await edit_message_safely(message=callback.message,
                                       text=text,
@@ -109,18 +130,33 @@ async def add_main_payment_product(message: Message, state: FSMContext):
                                                     stripe_product_id=stripe_product.id)
 
         await state.set_state(Announcement.adding_early_bird_payment_product)
+        dont_add_early_bird_text = await t_for(key="admin_interactions.create_announcement.buttons.dont_add_early_bird",
+                                               user_id=message.from_user.id,
+                                               default_locale=message.from_user.language_code)
+        payment_added_text = await t_for(key="admin_interactions.create_announcement.payment.main_payment_added",
+                                         user_id=message.from_user.id, default_locale=message.from_user.language_code,
+                                         product=stripe_product.name)
+        early_bird_dialogue_text = await t_for(key="admin_interactions.create_announcement.payment.early_bird_dialogue",
+                                               user_id=message.from_user.id,
+                                               default_locale=message.from_user.language_code)
         keyboard = await build_skip_button(announcement_id=announcement_id, group_id=group_id,
                                            action=AdminMenuAction.set_payment_expiration_date,
-                                           button_name="Don't add early bird payment")
+                                           button_name=dont_add_early_bird_text)
         reply = await bot.send_message(chat_id=message.chat.id,
-                                       text=f"Product '{stripe_product.name}' added successfully!\nDo you want me to add an early bird payment product as well?\nPlease reply with a stripe product id.",
+                                       text=f"{payment_added_text}\n\n{early_bird_dialogue_text}",
                                        reply_markup=keyboard)
     except Exception as e:
+        dont_add_payment_text = await t_for(key="admin_interactions.create_announcement.buttons.dont_add_payment",
+                                            user_id=message.from_user.id,
+                                            default_locale=message.from_user.language_code)
+        error_text = await t_for(key="admin_interactions.create_announcement.payment.main_payment_failed",
+                                 user_id=message.from_user.id, default_locale=message.from_user.language_code,
+                                 error=str(e))
         keyboard = await build_skip_button(announcement_id=announcement_id, group_id=group_id,
                                            action=AdminMenuAction.skip_to_pin_announcement,
-                                           button_name="Don't add payment")
+                                           button_name=dont_add_payment_text)
         reply = await bot.send_message(chat_id=message.chat.id,
-                                       text=f"Failed to add payment product: {e}.\n\nPlease check again and enter another product id.",
+                                       text=error_text,
                                        reply_markup=keyboard)
     await state.update_data(message_id=reply.message_id)
 
@@ -137,35 +173,59 @@ async def add_early_bird_payment_product(message: Message, state: FSMContext):
             stripe_product = await stripe_payment_service.get_product(message.text)
             await message_service.set_early_bird_stripe_product_id(group_id=group_id, message_id=announcement_id,
                                                                    early_bird_stripe_product_id=stripe_product.id)
+            dont_add_expiration_text = await t_for(
+                key="admin_interactions.create_announcement.buttons.dont_add_expiration",
+                user_id=message.from_user.id, default_locale=message.from_user.language_code)
+            early_bird_added_text = await t_for(key="admin_interactions.create_announcement.payment.early_bird_added",
+                                                user_id=message.from_user.id,
+                                                default_locale=message.from_user.language_code,
+                                                product=stripe_product.name)
+            expiration_dialogue_text = await t_for(
+                key="admin_interactions.create_announcement.payment.expiration_date_dialogue",
+                user_id=message.from_user.id, default_locale=message.from_user.language_code)
             keyboard = await build_skip_button(announcement_id=announcement_id, group_id=group_id,
                                                action=AdminMenuAction.set_participants_limit,
-                                               button_name="Don't add expiration date")
+                                               button_name=dont_add_expiration_text)
 
             await state.set_state(Announcement.setting_payment_expiration_date)
             reply = await bot.send_message(chat_id=message.chat.id,
-                                           text=f"Early bird '{stripe_product.name}' added successfully!\nDo you want to add an expiration date?\n\nPlease enter expiration date in format YYYY/MM/DD",
+                                           text=f"{early_bird_added_text}\n\n{expiration_dialogue_text}",
                                            reply_markup=keyboard)
         except Exception as e:
+            dont_add_early_bird_text = await t_for(
+                key="admin_interactions.create_announcement.buttons.dont_add_early_bird",
+                user_id=message.from_user.id, default_locale=message.from_user.language_code)
+            error_text = await t_for(key="admin_interactions.create_announcement.payment.early_bird_failed",
+                                     user_id=message.from_user.id, default_locale=message.from_user.language_code,
+                                     error=str(e))
             keyboard = await build_skip_button(announcement_id=announcement_id, group_id=group_id,
                                                action=AdminMenuAction.set_payment_expiration_date,
-                                               button_name="Don't add early bird payment")
+                                               button_name=dont_add_early_bird_text)
             reply = await bot.send_message(chat_id=message.chat.id,
-                                           text=f"Failed to add early bird payment product: {e}.\n\nPlease check again and enter another product id.",
+                                           text=error_text,
                                            reply_markup=keyboard)
     else:
+        back_text = await t_for(key="admin_interactions.buttons.back", user_id=message.from_user.id,
+                                default_locale=message.from_user.language_code)
         keyboard = await build_skip_button(announcement_id=announcement_id, group_id=group_id,
                                            action=AdminMenuAction.manage_announcements,
-                                           button_name="⬅️ Back")
+                                           button_name=back_text)
         try:
             stripe_product = await stripe_payment_service.get_product(message.text)
             await message_service.set_early_bird_stripe_product_id(group_id=group_id, message_id=announcement_id,
                                                                    early_bird_stripe_product_id=stripe_product.id)
+            success_text = await t_for(key="admin_interactions.create_announcement.payment.early_bird_added",
+                                       user_id=message.from_user.id, default_locale=message.from_user.language_code,
+                                       product=stripe_product.name)
             reply = await bot.send_message(chat_id=message.chat.id,
-                                           text=f"Early bird '{stripe_product.name}' added successfully!",
+                                           text=success_text,
                                            reply_markup=keyboard)
         except Exception as e:
+            error_text = await t_for(key="admin_interactions.create_announcement.payment.early_bird_failed",
+                                     user_id=message.from_user.id, default_locale=message.from_user.language_code,
+                                     error=str(e))
             reply = await bot.send_message(chat_id=message.chat.id,
-                                           text=f"Failed to add early bird payment product: {e}.\n\nPlease check again and enter another product id.",
+                                           text=error_text,
                                            reply_markup=keyboard)
 
     await state.update_data(message_id=reply.message_id)
@@ -176,10 +236,14 @@ async def show_expiration_date_dialogue(callback: CallbackQuery, callback_data: 
     await  state.set_state(Announcement.setting_payment_expiration_date)
     group_id = await state.get_value("group_id")
     announcement_id = await state.get_value("announcement_id")
-    text = "Do you want to add an expiration date?\n\nPlease enter expiration date in format YYYY/MM/DD"
+    text = await t_for(key="admin_interactions.create_announcement.payment.expiration_date_dialogue",
+                       user_id=callback.from_user.id, default_locale=callback.from_user.language_code)
+    dont_add_expiration_text = await t_for(key="admin_interactions.create_announcement.buttons.dont_add_expiration",
+                                           user_id=callback.from_user.id,
+                                           default_locale=callback.from_user.language_code)
     keyboard = await build_skip_button(announcement_id=announcement_id, group_id=group_id,
                                        action=AdminMenuAction.set_participants_limit,
-                                       button_name="Don't add expiration date")
+                                       button_name=dont_add_expiration_text)
     await edit_message_safely(callback.message, text=text, reply_markup=keyboard)
 
 
@@ -194,16 +258,27 @@ async def add_expiration_date(message: Message, state: FSMContext):
         await message_service.set_expiration_date(group_id=group_id, message_id=announcement_id,
                                                   expiration_date=expiration_date)
         await state.set_state(Announcement.setting_participants_limit)
+        dont_add_participants_limit_text = await t_for(
+            key="admin_interactions.create_announcement.buttons.dont_add_participants_limit",
+            user_id=message.from_user.id, default_locale=message.from_user.language_code)
+        success_text = await t_for(key="admin_interactions.create_announcement.payment.expiration_date_added",
+                                   user_id=message.from_user.id, default_locale=message.from_user.language_code)
+        participants_limit_dialogue_text = await t_for(
+            key="admin_interactions.create_announcement.payment.participants_limit_dialogue",
+            user_id=message.from_user.id, default_locale=message.from_user.language_code)
         keyboard = await build_skip_button(group_id=group_id, announcement_id=announcement_id,
                                            action=AdminMenuAction.set_announcement_button_name,
-                                           button_name="Don't add participants limit")
+                                           button_name=dont_add_participants_limit_text)
         reply = await bot.send_message(chat_id=message.chat.id,
-                                       text="Expiration date added successfully! Do you want to limit the number of participants?",
+                                       text=f"{success_text}\n\n{participants_limit_dialogue_text}",
                                        reply_markup=keyboard)
     except ValueError as e:
+        dont_add_expiration_text = await t_for(key="admin_interactions.create_announcement.buttons.dont_add_expiration",
+                                               user_id=message.from_user.id,
+                                               default_locale=message.from_user.language_code)
         keyboard = await build_skip_button(group_id=group_id, announcement_id=announcement_id,
                                            action=AdminMenuAction.set_participants_limit,
-                                           button_name="Don't add expiration date")
+                                           button_name=dont_add_expiration_text)
         reply = await bot.send_message(chat_id=message.chat.id, text=e.args[0], reply_markup=keyboard)
     await state.update_data(message_id=reply.message_id)
 
@@ -213,11 +288,16 @@ async def show_participants_limit_dialogue(callback: CallbackQuery, callback_dat
     await state.set_state(Announcement.setting_participants_limit)
     group_id = await state.get_value("group_id")
     announcement_id = await state.get_value("announcement_id")
-    text = "Do you want to limit the number of participants?"
+    dont_add_participants_limit_text = await t_for(
+        key="admin_interactions.create_announcement.buttons.dont_add_participants_limit",
+        user_id=callback.from_user.id, default_locale=callback.from_user.language_code)
+    participants_limit_dialogue_text = await t_for(
+        key="admin_interactions.create_announcement.payment.participants_limit_dialogue",
+        user_id=callback.from_user.id, default_locale=callback.from_user.language_code)
     keyboard = await build_skip_button(announcement_id=announcement_id, group_id=group_id,
                                        action=AdminMenuAction.set_announcement_button_name,
-                                       button_name="Don't add participants limit")
-    await edit_message_safely(callback.message, text=text, reply_markup=keyboard)
+                                       button_name=dont_add_participants_limit_text)
+    await edit_message_safely(callback.message, text=participants_limit_dialogue_text, reply_markup=keyboard)
 
 
 @router.message(Announcement.setting_participants_limit, F.text)
@@ -232,12 +312,21 @@ async def add_participants_limit(message: Message, state: FSMContext):
         await message_service.set_participants_limit(group_id=group_id, message_id=announcement_id,
                                                      participants_limit=participants_limit)
         await state.set_state(Announcement.setting_button_name)
+        success_text = await t_for(key="admin_interactions.create_announcement.payment.participants_limit_added",
+                                   user_id=message.from_user.id, default_locale=message.from_user.language_code,
+                                   limit=participants_limit)
+        button_name_dialogue_text = await t_for(
+            key="admin_interactions.create_announcement.payment.button_name_dialogue",
+            user_id=message.from_user.id, default_locale=message.from_user.language_code)
         reply = await bot.send_message(chat_id=message.chat.id,
-                                       text=f"You event is limited to {participants_limit} participants!\nFinally, let's choose a name for the button on the announcement. Please reply with the button name.")
+                                       text=f"{success_text}\n\n{button_name_dialogue_text}", )
     except ValueError as e:
+        dont_add_participants_limit_text = await t_for(
+            key="admin_interactions.create_announcement.buttons.dont_add_participants_limit",
+            user_id=message.from_user.id, default_locale=message.from_user.language_code)
         keyboard = await build_skip_button(announcement_id=announcement_id, group_id=group_id,
                                            action=AdminMenuAction.set_announcement_button_name,
-                                           button_name="Don't add participants limit")
+                                           button_name=dont_add_participants_limit_text)
         reply = await bot.send_message(chat_id=message.chat.id, text=e.args[0], reply_markup=keyboard)
     await state.update_data(message_id=reply.message_id)
 
@@ -245,7 +334,8 @@ async def add_participants_limit(message: Message, state: FSMContext):
 @router.callback_query(AdminCallback.filter(F.action == AdminMenuAction.set_announcement_button_name))
 async def show_setting_button_name_dialogue(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
     await state.set_state(Announcement.setting_button_name)
-    text = "Let's choose a name for the button on the announcement. Please reply with the button name."
+    text = await t_for(key="admin_interactions.create_announcement.payment.button_name_dialogue",
+                       user_id=callback.from_user.id, default_locale=callback.from_user.language_code)
     await edit_message_safely(callback.message, text=text)
 
 
@@ -255,12 +345,20 @@ async def set_announcement_button_name_and_show_callback_title_dialogue(message:
     await delete_messages_safely(message.chat.id, [message_id, message.message_id])
 
     if len(message.text) > 64:
-        reply = await bot.send_message(chat_id=message.chat.id, text="This title is too long!")
+        title_is_too_long_text = await t_for(key="admin_interactions.create_announcement.payment.title_too_long",
+                                             user_id=message.from_user.id,
+                                             default_locale=message.from_user.language_code)
+        reply = await bot.send_message(chat_id=message.chat.id, text=title_is_too_long_text)
     else:
         await state.set_state(Announcement.setting_callback_title)
+        success_text = await t_for(key="admin_interactions.create_announcement.payment.button_name_added",
+                                   user_id=message.from_user.id, default_locale=message.from_user.language_code,
+                                   name=message.text)
+        event_name_dialogue_text = await t_for(key="admin_interactions.create_announcement.payment.event_name_dialogue",
+                                               user_id=message.from_user.id,
+                                               default_locale=message.from_user.language_code)
         reply = await bot.send_message(chat_id=message.chat.id,
-                                       text=f"Button name will be set to <b>\"{message.text}\"</b>.\n"
-                                            f"Please write the event name for your announcement.")
+                                       text=f"{success_text}\n\n{event_name_dialogue_text}", )
     await state.update_data(message_id=reply.message_id, button_name=message.text)
 
 
@@ -272,14 +370,20 @@ async def set_callback_title(message: Message, state: FSMContext):
     button_name = await state.get_value("button_name")
     await delete_messages_safely(message.chat.id, [message_id, message.message_id])
     if len(message.text) > 64:
-        reply = await bot.send_message(chat_id=message.chat.id, text="This title is too long!")
+        title_is_too_long_text = await t_for(key="admin_interactions.create_announcement.payment.title_too_long",
+                                             user_id=message.from_user.id,
+                                             default_locale=message.from_user.language_code)
+        reply = await bot.send_message(chat_id=message.chat.id, text=title_is_too_long_text)
     else:
         try:
             await message_service.add_button_to_announcement(group_id=group_id, message_id=announcement_id,
                                                              button_text=button_name, event_name=message.text, )
             await state.set_state(Announcement.setting_reward_type)
             keyboard = await build_reward_type_keyboard(announcement_id=announcement_id, group_id=group_id)
-            reply = await bot.send_message(chat_id=message.chat.id, text="Which reward would you like to add?",
+            reward_dialogue_text = await t_for(key="admin_interactions.create_announcement.payment.reward_dialogue",
+                                               user_id=message.from_user.id,
+                                               default_locale=message.from_user.language_code)
+            reply = await bot.send_message(chat_id=message.chat.id, text=reward_dialogue_text,
                                            reply_markup=keyboard)
         except ValueError as e:
             reply = await bot.send_message(chat_id=message.chat.id, text=e.args[0])
@@ -292,13 +396,19 @@ async def set_reward_type(callback: CallbackQuery, callback_data: AdminCallback,
     await state.update_data(reward_type=callback_data.reward_type, message_id=callback.message.message_id)
     await state.set_state(Announcement.setting_thank_you_message)
 
-    text = F"Reward type set to {callback_data.reward_type.capitalize()}.\n\n"
+    success_text = await t_for(key="admin_interactions.create_announcement.payment.reward_type_set",
+                               user_id=callback.from_user.id, default_locale=callback.from_user.language_code,
+                               type=callback_data.reward_type.capitalize())
+    text = F"{success_text}\n\n"
     if callback_data.reward_type == "invite":
-        text += ("You've chosen to reward participants with an invitation to a group.\n"
-                 "<b>If you haven't done this yet, please <u>create the group NOW and promote me to administrator</u>!</b>\n\n")
+        invite_disclaimer = await t_for(key="admin_interactions.create_announcement.payment.invite_disclaimer",
+                                        user_id=callback.from_user.id, default_locale=callback.from_user.language_code)
+        text += f"{invite_disclaimer}\n\n"
 
-    text += (F"Please enter the thank you message you'd like to send to the participants.\n\n"
-             F"Add <b>%USERNAME%</b> if you want to include the username in the message.")
+    thank_you_message_dialogue_text = await t_for(
+        key="admin_interactions.create_announcement.payment.thank_you_message_dialogue",
+        user_id=callback.from_user.id, default_locale=callback.from_user.language_code)
+    text += thank_you_message_dialogue_text
     await edit_message_safely(callback.message, text=text)
 
 
@@ -314,30 +424,43 @@ async def set_thank_you_message(message: Message, state: FSMContext):
         await state.set_state(Announcement.setting_invitation_group)
         groups = await admin_service.get_my_groups_for_invitation(message.from_user.id, main_group_id)
         keyboard = await build_invitation_group_keyboard(groups)
-        text = (F"\"Thank you\" message set to:\n\n"
-                F"{message.text}\n\n"
-                F"Please choose the group where you'd like to invite the participants.")
-        await bot.send_message(chat_id=message.chat.id, text=text, reply_markup=keyboard)
+        success_text = await t_for(key="admin_interactions.create_announcement.payment.thank_you_message_set",
+                                   user_id=message.from_user.id, default_locale=message.from_user.language_code,
+                                   thank_you_message=message.text)
+        invitation_group_dialogue_text = await t_for(
+            key="admin_interactions.create_announcement.payment.invitation_group_dialogue",
+            user_id=message.from_user.id,
+            default_locale=message.from_user.language_code)
+        await bot.send_message(chat_id=message.chat.id, text=f"{success_text}\n\n{invitation_group_dialogue_text}",
+                               reply_markup=keyboard)
     else:
         announcement_id = await state.get_value("announcement_id")
         announcement = await message_service.get_message(group_id=group_id, message_id=announcement_id)
         await reward_service.create_reward(announcement_id=announcement.id, reward_type=reward_type,
-                                                    thank_you_message=message.text)
+                                           thank_you_message=message.text)
         can_pin_announcements = await group_permission_service.check_permission(group_id, "can_pin_messages")
+        success_text = await t_for(key="admin_interactions.create_announcement.announcement_sent",
+                                   user_id=message.from_user.id, default_locale=message.from_user.language_code)
         if can_pin_announcements:
             await state.set_state(Announcement.confirming_pin)
+            pin_dialogue_text = await t_for(key="admin_interactions.create_announcement.pin.pin_dialogue",
+                                            user_id=message.from_user.id,
+                                            default_locale=message.from_user.language_code)
             keyboard = await build_confirm_pin_keyboard(group_id=group_id, announcement_id=announcement_id)
             await bot.send_message(chat_id=message.chat.id,
-                                   text=f"Announcement created successfully!\n\nDo you want me to pin it?",
+                                   text=f"{success_text}\n\n{pin_dialogue_text}",
                                    reply_markup=keyboard)
         else:
             group = await group_service.get_group(group_id)
             features = await group_service.get_features(group_id)
             keyboard = await build_main_features_keyboard(group_id, features,
                                                           message.from_user.id == settings.ADMIN_TELEGRAM_ID)
-            text = f"Announcement sent successfully!\n\nSelected group: {group.title}. What do you want to do with it?"
-
-            await bot.send_message(chat_id=message.chat.id, text=text, reply_markup=keyboard)
+            group_features_dialogue = await t_for(key="admin_interactions.group_management.group_selected",
+                                                  user_id=message.from_user.id,
+                                                  default_locale=message.from_user.language_code,
+                                                  title=group.title)
+            await bot.send_message(chat_id=message.chat.id, text=f"{success_text}\n\n{group_features_dialogue}",
+                                   reply_markup=keyboard)
             await state.set_state(AdminPanel.managing_features)
 
 
@@ -356,16 +479,27 @@ async def set_invitation_group(callback: CallbackQuery, callback_data: AdminCall
     if can_pin_announcements:
         await state.set_state(Announcement.confirming_pin)
         keyboard = await build_confirm_pin_keyboard(group_id=group_id, announcement_id=announcement_id)
-        text = f"A reward to join group {reward_group.title} has been created successfully!\n\nDo you want me to pin the announcement?"
-        await edit_message_safely(message=callback.message, text=text, reply_markup=keyboard)
+        success_text = await t_for(key="admin_interactions.create_announcement.payment.invitation_reward_created",
+                                   user_id=callback.from_user.id, default_locale=callback.from_user.language_code,
+                                   group_title=reward_group.title)
+        pin_dialogue_text = await t_for(key="admin_interactions.create_announcement.pin.pin_dialogue",
+                                        user_id=callback.from_user.id,
+                                        default_locale=callback.from_user.language_code)
+        await edit_message_safely(message=callback.message, text=f"{success_text}\n\n{pin_dialogue_text}",
+                                  reply_markup=keyboard)
     else:
         group = await group_service.get_group(group_id)
         features = await group_service.get_features(group_id)
         keyboard = await build_main_features_keyboard(group_id, features,
                                                       callback.from_user.id == settings.ADMIN_TELEGRAM_ID)
-        text = f"Announcement sent successfully!\n\nSelected group: {group.title}. What do you want to do with it?"
-
-        await edit_message_safely(message=callback.message, text=text, reply_markup=keyboard)
+        success_text = await t_for(key="admin_interactions.create_announcement.announcement_sent",
+                                   user_id=callback.from_user.id, default_locale=callback.from_user.language_code)
+        group_features_dialogue = await t_for(key="admin_interactions.group_management.group_selected",
+                                              user_id=callback.from_user.id,
+                                              default_locale=callback.from_user.language_code,
+                                              title=group.title)
+        await edit_message_safely(message=callback.message, text=f"{success_text}\n\n{group_features_dialogue}",
+                                  reply_markup=keyboard)
         await state.set_state(AdminPanel.managing_features)
 
 
@@ -378,7 +512,10 @@ async def show_pin_dialogue(callback: CallbackQuery, callback_data: AdminCallbac
     if not can_pin_announcements:
         keyboard = await build_confirm_pin_keyboard(group_id=callback_data.group_id,
                                                     announcement_id=callback_data.announcement_id)
-        await edit_message_safely(message=callback.message, text=f"Do you want me to pin the announcement?",
+        pin_dialogue_text = await t_for(key="admin_interactions.create_announcement.pin.pin_dialogue",
+                                        user_id=callback.from_user.id,
+                                        default_locale=callback.from_user.language_code)
+        await edit_message_safely(message=callback.message, text=pin_dialogue_text,
                                   reply_markup=keyboard)
         await state.set_state(Announcement.confirming_pin)
     else:
@@ -386,10 +523,14 @@ async def show_pin_dialogue(callback: CallbackQuery, callback_data: AdminCallbac
         features = await group_service.get_features(callback_data.group_id)
         keyboard = await build_main_features_keyboard(callback_data.group_id, features,
                                                       callback.from_user.id == settings.ADMIN_TELEGRAM_ID)
-        text = f"Announcement sent successfully!\n\nSelected group: {group.title}. What do you want to do with it?"
-
+        success_text = await t_for(key="admin_interactions.create_announcement.announcement_sent",
+                                   user_id=callback.from_user.id, default_locale=callback.from_user.language_code)
+        group_features_dialogue = await t_for(key="admin_interactions.group_management.group_selected",
+                                              user_id=callback.from_user.id,
+                                              default_locale=callback.from_user.language_code,
+                                              title=group.title)
         await edit_message_safely(message=callback.message,
-                                  text=text,
+                                  text=f"{success_text}\n\n{group_features_dialogue}",
                                   reply_markup=keyboard)
         await state.set_state(AdminPanel.managing_features)
 
@@ -399,7 +540,9 @@ async def show_pin_dialogue(callback: CallbackQuery, callback_data: AdminCallbac
 async def pin_announcement(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
     await bot.pin_chat_message(chat_id=callback_data.group_id, message_id=callback_data.announcement_id)
     await message_service.pin_message(group_id=callback_data.group_id, message_id=callback_data.announcement_id)
-    await callback.answer("Pinned successfully!")
+    success_text = await t_for(key="admin_interactions.create_announcement.pin.pinned",
+                               user_id=callback.from_user.id, default_locale=callback.from_user.language_code)
+    await callback.answer(success_text)
 
     await state.set_state(AdminPanel.managing_features)
     await process_group_selection(callback, callback_data, state)

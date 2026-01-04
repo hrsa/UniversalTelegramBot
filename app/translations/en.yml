@@ -1,0 +1,85 @@
+en:
+  admin_interactions:
+    errors:
+      command_available_in_private_chats: "This command is available only in private chats."
+      no_admin_groups: "You are not an admin of any group that includes me."
+
+    hello: |
+      Hello %{name}!
+      Please select a group from the list below.
+
+    backups:
+      restore:
+        error: "Failed to download backup: %{error}"
+        success: "Backup downloaded successfully!"
+        not_admin: "Only my creator can restore backups."
+      run:
+        not_admin: "Only my creator can run backups."
+        success: |
+          Backup upload completed successfully!
+          Uploaded: %{uploaded}/%{found},
+          Failed: %{failed}
+        no_backups: "No backup files found."
+        error: "Failed to upload backup: %{error}"
+
+    group_management:
+      group_selected: "Selected group: <b>%{title}</b>.\nWhat do you want to do?"
+      feature_updated: "\"%{feature}\" updated successfully!"
+      has_greeting_message: "%{title} has the following greeting message:"
+
+    back_to_main: "Back to main menu"
+
+    buttons:
+      back: "⬅️ Back"
+
+    create_announcement:
+      enter_text: "Please enter the <b>text</b> of the announcement for %{group_name}."
+      confirm_announcement: "Here is the announcement i'll send:"
+      failed_to_send_announcement: "Failed to send announcement. Please try again later."
+      announcement_sent: "Announcement sent successfully!"
+      buttons:
+        dont_add_payment: "Don't add payment"
+        dont_add_early_bird: "Don't add early bird payment"
+        dont_add_expiration: "Don't add expiration date"
+        dont_add_participants_limit: "Don't add participants limit"
+      payment:
+        add_payment_dialogue: |
+          Would you like to add a payment button to this announcement?
+          If yes - please reply with the Stripe product ID you'd like to attach.
+        main_payment_added: "Product \"%{product}\" added successfully!"
+        main_payment_failed: "Failed to add product: %{error}. Please re-check the Stripe product ID and try again."
+        add_early_bird_dialogue: |
+          Would you like to add an early bird product as well?
+          If yes - please reply with the Stripe product ID you'd like to attach.'
+        early_bird_added: "Early bird product \"%{product}\" added successfully!"
+        early_bird_failed: "Failed to add early bird product: %{error}. Please re-check the Stripe product ID and try again."
+        expiration_date_dialogue: |
+          Do you want to add an expiration date?
+          Please enter expiration date in format "<b>YYYY/MM/DD</b>"
+        expiration_date_added: "Expiration date added successfully!"
+        participants_limit_dialogue: |
+          Do you want to add a participants limit?
+          Please enter the maximum number.
+        participants_limit_added: "Your event is now limited to %{limit} participants."
+        button_name_dialogue: |
+          Let's choose a name for the button on the announcement.
+          Please reply with the button name.
+        title_too_long: "Title is too long. Please try again with a shorter one."
+        button_name_added: "Button name will be: <b>\"%{name}\"</b>."
+        event_name_dialogue: "What's the name of your event?"
+        reward_dialogue: "What type of reward would you like to add?"
+        reward_type_set: "Reward type set to: <b>%{type}</b>."
+        invite_disclaimer: |
+          You've chosen to reward participants with an invitation to a group.
+          <b>If you haven't done this yet, please <u>create the group NOW and promote me to administrator</u>!</b>
+        thank_you_message_dialogue: | 
+          Please enter the thank you message you'd like to send to the participants.
+          Add <b>%USERNAME%</b> if you want to include the username in the message.
+        thank_you_message_set: |
+          Thank you message set to:
+          "<b>%{thank_you_message}</b>"
+        invitation_group_dialogue: "Please choose the group where you'd like to invite the participants."
+        invitation_reward_created: "A reward to join group \"<b>%{group_title}</b>\" has been created successfully!"
+      pin:
+        pin_dialogue: "Would you like to pin this announcement?"
+        pinned: "Announcement pinned successfully!"

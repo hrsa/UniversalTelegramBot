@@ -12,7 +12,7 @@ async def get_or_create_user(
         first_name: str | None = None,
         last_name: str | None = None,
         username: str | None = None,
-        is_bot: bool |None = None,
+        is_bot: bool | None = None,
 ) -> User:
     result = await session.execute(
         select(User).where(User.id == user_id)
@@ -49,6 +49,7 @@ async def get_or_create_user(
     await session.refresh(user)
     return user
 
+
 async def get_group_admins(session: AsyncSession, group_id: int) -> Sequence[User]:
     result = await session.execute(
         select(User)
@@ -62,3 +63,7 @@ async def get_group_admins(session: AsyncSession, group_id: int) -> Sequence[Use
         )
     )
     return result.scalars().all()
+
+
+async def get_locale(session: AsyncSession, user_id: int) -> str:
+    return (await session.execute(select(User.locale).where(User.id == user_id))).scalar_one()

@@ -1,6 +1,7 @@
 import sys
 from contextlib import asynccontextmanager
 
+import i18n
 from fastapi import FastAPI
 from loguru import logger
 
@@ -14,6 +15,10 @@ from app.scheduler.setup import setup_scheduler, scheduler
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    i18n.set("filename_format", "{locale}.yml")
+    i18n.set("load_path", ["app/translations"])
+    i18n.set("fallback", "en")
+
     dp.include_routers(*all_routers)
 
     await redis_broker.start()
@@ -56,3 +61,4 @@ if settings.ENV == "production":
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
+

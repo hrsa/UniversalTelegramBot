@@ -1,0 +1,164 @@
+ru:
+  admin_interactions:
+    errors:
+      command_available_in_private_chats: "Эта команда доступна только в приватном чате."
+      no_admin_groups: "Ты не являешься администратором ни одной группы, в которой я присутствую."
+
+    hello: |
+      Привет %{name}!
+      Выбери группу из списка ниже.
+
+    backups:
+      restore:
+        error: "Не удалось скачать резервную копию: %{error}"
+        success: "Резервная копия успешно скачана!"
+        not_admin: "Только мой создатель может восстанавливать резервные копии."
+      run:
+        not_admin: "Только мой создатель может запускать резервное копирование."
+        success: |
+          Резервное копирование успешно завершено!
+          Загружено: %{uploaded}/%{found},
+          Ошибок: %{failed}
+        no_backups: "Резервных копий не найдено."
+        error: "Не удалось загрузить резервную копию: %{error}"
+
+    group_management:
+      group_selected: "Выбранная группа: <b>%{title}</b>.\nЧто будем делать?"
+      feature_updated: "\"%{feature}\" обновлено!"
+      has_greeting_message: "В группе %{title} настроено следующее приветствие:"
+
+    greeting_watch:
+      new_greeting_message_dialogue: | 
+        Напиши новое приветствие. Не забудь добавить хештег, например <b>#bio</b> или <b>#greeting</b>.
+        Добавь <b>%USERNAME%</b>, если хочешь подставлять имя пользователя в сообщение.
+      new_reminder_message_dialogue: | 
+        Напиши новое напоминание для пользователей, которые ещё не прислали приветствие.
+        Добавь <b>%USERNAME%</b>, если хочешь подставлять имя пользователя в сообщение.
+
+    back_to_main: "Назад в главное меню"
+
+    buttons:
+      back: "⬅️ Назад"
+
+    create_announcement:
+      enter_text: "Напиши <b>текст</b> объявления для %{group_name}."
+      confirm_announcement: "Вот объявление, которое я отправлю:"
+      failed_to_send_announcement: "Не удалось отправить объявление. Пожалуйста, попробуй ещё раз позже."
+      announcement_sent: "Объявление успешно отправлено!"
+      buttons:
+        dont_add_payment: "Не добавлять оплату"
+        dont_add_early_bird: "Не добавлять early bird оплату"
+        dont_add_expiration: "Не добавлять дату окончания"
+        dont_add_participants_limit: "Не ограничивать количество участников"
+      payment:
+        add_payment_dialogue: |
+          Хочешь добавить к этому объявлению кнопку оплаты?
+          Если да — напиши Stripe ID продукта, который нужно прикрепить.
+        main_payment_added: "Продукт \"%{product}\" успешно добавлен!"
+        main_payment_failed: "Не удалось добавить продукт: %{error}. Пожалуйста, проверь Stripe ID продукта и попробуй ещё раз."
+        add_early_bird_dialogue: |
+          Хочешь также добавить "early bird" продукт?
+          Если да — напиши Stripe ID продукта, который нужно прикрепить.
+        early_bird_added: "Early bird продукт \"%{product}\" успешно добавлен!"
+        early_bird_failed: "Не удалось добавить early bird продукт: %{error}. Пожалуйста, проверь Stripe ID продукта и попробуй ещё раз."
+        expiration_date_dialogue: |
+          Хочешь добавить дату, после которой не принимается оплата?
+          Пожалуйста, введи эту дату в формате "<b>YYYY/MM/DD</b>"
+        expiration_date_added: "Дата окончания добавлена!"
+        participants_limit_dialogue: |
+          Хочешь ограничить количество участников?
+          Напиши максимальное количество.
+        participants_limit_added: "Теперь в этом событии может участвовать не более %{limit} участников."
+        button_name_dialogue: |
+          Давай выберем название для кнопки в объявлении.
+          Пожалуйста, напиши название кнопки.
+        title_too_long: "Слишком длинный заголовок. Пожалуйста, попробуй ещё раз, покороче."
+        button_name_added: "Название кнопки будет: <b>\"%{name}\"</b>."
+        event_name_dialogue: "Как называется твоё событие?"
+        reward_dialogue: "Какую награду добавим?"
+        reward_type_set: "Выбран тип награды: <b>%{type}</b>."
+        invite_disclaimer: |
+          Участники получат приглашение в группу после оплаты.
+          <b>Если это ещё этого не сделано, пожалуйста, <u>создай группу СЕЙЧАС и назначь меня администратором</u>!</b>
+        thank_you_message_dialogue: | 
+          Пожалуйста, напиши благодарственное сообщение, которое будут получать участники, сделавшие оплату.
+          Добавь <b>%USERNAME%</b>, если хочешь подставлять их имя пользователя в сообщение.
+        thank_you_message_set: |
+          Благодарственное сообщение:
+          "<b>%{thank_you_message}</b>"
+        invitation_group_dialogue: "Пожалуйста, выбери группу, в которую будут приглашены участники."
+        invitation_reward_created: "Награда в виде приглашения в группу \"<b>%{group_title}</b>\" создана!"
+      pin:
+        pin_dialogue: "Закрепим твоё объявление?"
+        pinned: "Объявление закреплено!"
+
+    manage_announcement:
+      announcement_deleted: "Объявление удалено!"
+      expires_on: "Срок действия объявления: <b>%{expires_on}</b>"
+      enter_new_expiration_date: "Пожалуйста, введи новую дату окончания в формате <b>YYYY/MM/DD</b>."
+      expiration_date_modified: "Дата окончания успешно изменена!"
+      announcement_pinned: "Объявление закреплено!"
+      announcement_unpinned: "Объявление откреплено!"
+      modify_participants_limit_dialogue: | 
+        Максимальное количество участников сейчас: <b>%{current_limit}</b>.
+        Пожалуйста, введите новое максимальное количество участников.
+      modify_button_name_dialogue: | 
+        Пожалуйста, напиши новое название кнопки для твоего объявления.
+        Не используй больше 64 символов.
+      modify_event_name_dialogue: | 
+        Название кнопки будет: <b>%{button_name}</b>.
+        Теперь напиши название события.
+        Ты можешь ответить <b>\"skip\"</b>, чтобы пропустить этот шаг и использовать %{button_name} как название события.
+      button_and_event_modified: "Кнопка \"<b>%{button_name}</b>\" обновлена для управления событием \"<b>%{event_name}</b>\"."
+      invitation_group_modified: "Теперь участники будут получать приглашение в группу \"<b>%{group_title}</b>\"."
+      remove_payment:
+        main: |
+          Ты точно хочешь удалить оплату?
+          Это приведёт к удалению:
+          - Кнопки из объявления
+          - Основного продукта — %{payment_product_id}
+        early_bird: "\n- Early bird продукта - %{payment_product_id}"
+        expiration: "\n- Даты окончания - %{expiration_date}"
+        participants_limit: "\n- Лимита участников - %{limit}"
+        success: "Оплата удалена!"
+        error: "Не получилось удалить оплату: %{error}"
+        confirmation_button: "⛔ Я понимаю. Удалить оплату ⛔"
+      remove_early_bird_payment:
+        main: "Ты точно хочешь удалить Early bird оплату - %{payment_product_id}?"
+        success: "Оплата Early bird удалена!"
+        error: "Не получилось удалить оплату Early bird: %{error}"
+        confirmation_button: "⛔ Я понимаю. Удалить Early bird оплату ⛔"
+      reply_with_stripe_id: "Напиши Stripe ID продукта, который нужно прикрепить."
+      choose_reward_type: "Выбери тип награды."
+      invitation_group_reminder: "<b>Если не можешь найти группу, пожалуйста, <u>сначала добавь меня в неё и назначь администратором</u>!</b>"
+      reward_message_set: "Выбрана награда с благодарственным сообщением."
+      thank_you_message_error: |
+        Не удалось обновить сообщение «Спасибо»: %{error}.
+        Пожалуйста, проверь текст и попробуйте ещё раз.
+
+  user_interactions:
+    on_join:
+      check_your_private_chat: "👀 Послал тебе сообщение в личку! 👀"
+      greeting: |
+        Привет, %{user_name}!
+        Я - бот-администратор <b>%{group_title}</b>.
+      event_expired: "Мне очень жаль, но <b>\"%{event_name}\"</b> уже давно закончилось, поэтому ты не можешь участвовать."
+      event_is_full: "Мне очень жаль, но на <b>\"%{event_name}\"</b> превышено максимальное количество участников."
+      no_pending_participants: |
+        Все участники оплатили билеты, поэтому свободных мест не осталось.
+        Ждём тебя в следующий раз!
+      has_pending_participants: |
+        Сейчас есть %{pending_participants_count} участников, не оплативших билеты.
+        Если они не оплатят их в течение 15 минут - я дам их место тебе и напишу!
+      user_already_paid: "Ты уже участвуешь в <b>\"%{event_name}\"</b>."
+      thank_you_plus_link: |
+        Спасибо за твой интерес к "<b>%{event_name}</b>"!
+        Вот твоя ссылка на оплату: %{payment_link}
+      payment_link_disclaimer: "Напоминаю, эта ссылка действительна <b><u>в течение 15 минут</u></b>!"
+      payment_link_expired: |
+        Срок действия ссылки на оплату истёк, и ее больше нельзя использовать.
+        Нажми ещё раз на кнопку в сообщении группы, если ты всё ещё хочешь участвовать!
+      payment_available: |
+        Хорошая новость, для тебя освободилось место!
+        Вот твоя ссылка на оплату:      
+        %{payment_link}

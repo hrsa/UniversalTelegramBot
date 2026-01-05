@@ -1,0 +1,28 @@
+fr:
+  user_interactions:
+    on_join:
+      check_your_private_chat: "👀 Je t'ai envoyé un message privé! 👀"
+      greeting: |
+        Salut %{user_name}!
+        Je suis l'administrateur de <b>%{group_title}</b>.
+      event_expired: "Désolé, <b>\"%{event_name}\"</b> est déjà terminé. Tu ne peux plus y participer."
+      event_is_full: "Désolé, <b>\"%{event_name}\"</b> est complet."
+      no_pending_participants: |
+        Tous les participants ont payé, il ne reste donc aucune place disponible.
+        On espère te voir la prochaine fois !
+      has_pending_participants: |
+        Il y a actuellement %{pending_participants_count} participant(s) qui n'ont pas encore payé.
+        S'ils ne paient pas dans les 15 prochaines minutes, je te donnerai leur place et je t'écrirai !
+      user_already_paid: "Tu participes déjà à <b>\"%{event_name}\"</b>."
+      thank_you_plus_link: |
+        Merci pour ton intérêt pour "<b>%{event_name}</b>" !
+        Voici ton lien de paiement : %{payment_link}
+      payment_link_disclaimer: "N'oublie pas, ce lien est valable <b><u>seulement pendant 15 minutes</u></b> !"
+      payment_link_expired: |
+        Ton lien de paiement a expiré et ne peut plus être utilisé.
+        Clique à nouveau sur le message dans le groupe si tu veux toujours participer !
+      payment_available: |
+        Bonne nouvelle, une place s'est libérée pour toi !
+        Voici ton lien de paiement :      
+        
+        %{payment_link}

@@ -11,6 +11,7 @@ from app.helpers.admin_interactions import build_greeting_watch_keyboard, \
 from app.services.admin import AdminService
 from app.services.group import GroupService
 from app.services.group_permission import GroupPermissionService
+from app.services.translation import t_for
 
 router = Router()
 group_permission_service = GroupPermissionService(async_session_maker)
@@ -32,9 +33,9 @@ async def open_greeting_watch(callback: CallbackQuery, callback_data: AdminCallb
 @router.callback_query(GreetingWatch.managing_greeting_watch,
                        AdminCallback.filter(F.action == AdminMenuAction.set_greeting_message))
 async def request_new_greeting_message(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
-    await edit_message_safely(message=callback.message,
-                              text="Please enter a new greeting message. Don't forget to include a hashtag like #bio or #greeting."
-                                   "Add %USERNAME% if you want to include the username in the message.")
+    new_greeting_message_dialogue = await t_for(key="admin_interactions.greeting_watch.new_greeting_message_dialogue",
+                                                user_id=callback.from_user.id)
+    await edit_message_safely(message=callback.message, text=new_greeting_message_dialogue)
     await state.update_data(group_id=callback_data.group_id)
     await state.update_data(message_id=callback.message.message_id)
     await state.set_state(GreetingWatch.setting_greeting_message)
@@ -62,9 +63,9 @@ async def set_new_greeting_message(message: Message, state: FSMContext):
 @router.callback_query(GreetingWatch.managing_greeting_watch,
                        AdminCallback.filter(F.action == AdminMenuAction.set_reminder_message))
 async def request_new_reminder_message(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
-    await edit_message_safely(message=callback.message,
-                              text="Please enter a new reminder message that will be followed by the repeated greeting."
-                                   "Add %USERNAME% if you want to include the username in the message.")
+    new_reminder_message_dialogue = await t_for(key="admin_interactions.greeting_watch.new_reminder_message_dialogue",
+                                                user_id=callback.from_user.id)
+    await edit_message_safely(message=callback.message, text=new_reminder_message_dialogue)
     await state.update_data(group_id=callback_data.group_id)
     await state.update_data(message_id=callback.message.message_id)
     await state.set_state(GreetingWatch.setting_reminder_message)

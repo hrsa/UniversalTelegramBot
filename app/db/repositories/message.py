@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 from typing import Sequence
 
-from loguru import logger
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -10,7 +9,6 @@ from sqlalchemy.orm import selectinload
 from app.db.models.message import Message
 from app.db.models.payment import Payment
 from app.db.models.reward import Reward
-from app.db.models.user import User
 
 
 async def get_message(session: AsyncSession, announcement_id: int | None = None, group_id: int | None = None,

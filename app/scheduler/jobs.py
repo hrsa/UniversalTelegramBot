@@ -13,6 +13,7 @@ from app.services.message import MessageService
 from app.services.payment import PaymentService
 from app.services.s3_backup import S3BackupService
 from app.services.stripe_payment import StripePaymentService
+from app.services.translation import t_for
 from app.services.user import UserService, notify_user
 
 user_service = UserService(async_session_maker)
@@ -67,8 +68,9 @@ async def invalidate_old_pending_payments():
             await stripe_service.disable_payment_link(payment.stripe_payment_id)
             await payment_service.update_payment(user_id=payment.user_id, announcement_id=payment.message_id,
                                                  status="expired")
+            payment_link_expired_text = await t_for(key="user_interactions.on_join.payment_link_expired", user_id=payment.user_id)
             await notify_user(user_id=payment.user_id,
-                              message="Your payment link has expired and can't be used anymore.\nPlease click on the announcement again if you still want to join.")
+                              message=payment_link_expired_text)
 
 
 async def activate_waiting_payments():
@@ -78,11 +80,12 @@ async def activate_waiting_payments():
         if not is_full:
             await payment_service.update_payment(user_id=payment.user_id, announcement_id=payment.message_id,
                                                  status="pending", created_at=datetime.now(timezone.utc))
-            message = (f"Congratulations, a place for you is available! Please click on the link to confirm your participation."
-                       f"\n\n{payment.url}\n\n"
-                       f"Please remember, this link is valid <b><u>only for 15 minutes</u></b>!")
+            payment_available_text = await t_for(key="user_interactions.on_join.payment_available", user_id=payment.user_id,
+                                                 payment_link=payment.url)
+            disclaimer_text = await t_for(key="user_interactions.on_join.payment_link_disclaimer", user_id=payment.user_id)
+
             await notify_user(user_id=payment.user_id,
-                              message=message)
+                              message=f"{payment_available_text}\n\n{disclaimer_text}")
 
 
 async def upload_backups_to_s3():

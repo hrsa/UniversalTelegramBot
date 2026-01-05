@@ -1,4 +1,5 @@
 import i18n
+from loguru import logger
 
 from app.db.session import async_session_maker
 from app.db.repositories import user as user_repo
@@ -19,5 +20,4 @@ async def t_for(
             locale = await group_repo.get_locale(session, group_id)
         else:
             locale = default_locale
-
     return i18n.t(key, locale=locale, **kwargs)

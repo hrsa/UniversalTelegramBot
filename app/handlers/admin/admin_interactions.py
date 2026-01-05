@@ -25,19 +25,20 @@ admin_service = AdminService(async_session_maker, group_service, group_permissio
 @router.message(Command("manage"))
 async def start_command(message: Message, state: FSMContext):
     if message.chat.type != "private":
-        text = await t_for(key="admin_interactions.errors.command_available_in_private_chats", user_id=message.from_user.id, default_locale=message.from_user.language_code)
+        text = await t_for(key="admin_interactions.errors.command_available_in_private_chats",
+                           user_id=message.from_user.id)
         await message.answer(text)
         return
 
     my_groups = await admin_service.get_my_groups(message.from_user.id)
     if not my_groups:
         text = await t_for(key="admin_interactions.errors.no_admin_groups",
-                           user_id=message.from_user.id, default_locale=message.from_user.language_code)
+                           user_id=message.from_user.id)
         await message.answer(text)
         return
 
     welcome_text = await t_for(key="admin_interactions.hello",
-                           user_id=message.from_user.id, default_locale=message.from_user.language_code, name=message.from_user.full_name)
+                               user_id=message.from_user.id, name=message.from_user.full_name)
 
     keyboard = await build_group_selection_keyboard(my_groups)
 
@@ -51,7 +52,7 @@ async def restore_backup(message: Message, state: FSMContext):
     await delete_messages_safely(message.chat.id, [message.message_id])
     if message.from_user.id != settings.ADMIN_TELEGRAM_ID:
         text = await t_for(key="admin_interactions.backups.restore.not_admin",
-                           user_id=message.from_user.id, default_locale=message.from_user.language_code)
+                           user_id=message.from_user.id)
         await bot.send_message(message.chat.id, text=text)
         return
 
@@ -59,11 +60,11 @@ async def restore_backup(message: Message, state: FSMContext):
         s3 = S3BackupService()
         await s3.download_latest_backup()
         text = await t_for(key="admin_interactions.backups.restore.success",
-                           user_id=message.from_user.id, default_locale=message.from_user.language_code)
+                           user_id=message.from_user.id)
         await bot.send_message(message.chat.id, text)
     except Exception as e:
         text = await t_for(key="admin_interactions.backups.restore.error",
-                           user_id=message.from_user.id, default_locale=message.from_user.language_code, error=str(e))
+                           user_id=message.from_user.id, error=str(e))
         await bot.send_message(message.chat.id, text)
 
 
@@ -72,7 +73,7 @@ async def force_backup(message: Message, state: FSMContext):
     await delete_messages_safely(message.chat.id, [message.message_id])
     if message.from_user.id != settings.ADMIN_TELEGRAM_ID:
         text = await t_for(key="admin_interactions.backups.run.not_admin",
-                           user_id=message.from_user.id, default_locale=message.from_user.language_code)
+                           user_id=message.from_user.id)
         await bot.send_message(message.chat.id, text)
         return
 
@@ -82,16 +83,16 @@ async def force_backup(message: Message, state: FSMContext):
 
         if stats["found"] > 0:
             text = await t_for(key="admin_interactions.backups.run.success",
-                               user_id=message.from_user.id, default_locale=message.from_user.language_code,
+                               user_id=message.from_user.id,
                                uploaded=stats["uploaded"], found=stats["found"], failed=stats["failed"])
             await bot.send_message(message.chat.id, text)
         else:
             text = await t_for(key="admin_interactions.backups.run.no_backups",
-                               user_id=message.from_user.id, default_locale=message.from_user.language_code)
+                               user_id=message.from_user.id)
             await bot.send_message(message.chat.id, "No backup files found.")
     except Exception as e:
         text = await t_for(key="admin_interactions.backups.run.error",
-                           user_id=message.from_user.id, default_locale=message.from_user.language_code,
+                           user_id=message.from_user.id,
                            error=str(e))
         await bot.send_message(message.chat.id, text)
 
@@ -104,8 +105,7 @@ async def process_group_selection(callback: CallbackQuery, callback_data: AdminC
     can_manage_payments = callback.from_user.id == settings.ADMIN_TELEGRAM_ID
     keyboard = await build_main_features_keyboard(group_id, features, can_manage_payments)
     text = await t_for(key="admin_interactions.group_management.group_selected",
-                       user_id=callback.from_user.id, default_locale=callback.from_user.language_code,
-                       title=group.title)
+                       user_id=callback.from_user.id, title=group.title)
 
     await edit_message_safely(message=callback.message,
                               text=text,
@@ -126,22 +126,23 @@ async def toggle_feature(callback: CallbackQuery, callback_data: AdminCallback, 
             await edit_message_safely(message=callback.message, text=e.args[1], reply_markup=keyboard)
         return
     feature_updated = await t_for(key="admin_interactions.group_management.feature_updated",
-                                  user_id=callback.from_user.id, default_locale=callback.from_user.language_code,
+                                  user_id=callback.from_user.id,
                                   feature=feature_name.replace("_", " ").capitalize())
     await callback.answer(feature_updated)
 
     if await state.get_state() == AdminPanel.managing_features:
         group_selected = await t_for(key="admin_interactions.group_management.group_selected",
-                       user_id=callback.from_user.id, default_locale=callback.from_user.language_code,
-                       title=group.title)
+                                     user_id=callback.from_user.id,
+                                     title=group.title)
         features = await group_service.get_features(group_id)
         keyboard = await build_main_features_keyboard(group_id, features,
                                                       callback.from_user.id == settings.ADMIN_TELEGRAM_ID)
-        await edit_message_safely(message=callback.message, text=f"{feature_updated}\n\n{group_selected}", reply_markup=keyboard)
+        await edit_message_safely(message=callback.message, text=f"{feature_updated}\n\n{group_selected}",
+                                  reply_markup=keyboard)
 
     elif await state.get_state() == GreetingWatch.managing_greeting_watch:
         has_greeting_message = await t_for(key="admin_interactions.group_management.has_greeting_message",
-                                           user_id=callback.from_user.id, default_locale=callback.from_user.language_code,
+                                           user_id=callback.from_user.id,
                                            title=group.title)
         message_text = f"{feature_updated}\n\n" \
                        f"{has_greeting_message}\n\n" \
@@ -163,14 +164,13 @@ async def go_back(callback: CallbackQuery, callback_data: AdminCallback, state: 
         my_groups = await admin_service.get_my_groups(callback.from_user.id)
 
         welcome_text = await t_for(key="admin_interactions.hello", user_id=callback.from_user.id,
-                                   default_locale=callback.from_user.language_code, name=callback.from_user.full_name)
+                                   name=callback.from_user.full_name)
 
         keyboard = await build_group_selection_keyboard(my_groups)
 
         await edit_message_safely(message=callback.message, text=welcome_text, reply_markup=keyboard)
     else:
-        text = await t_for(key="admin_interactions.back_to_main", user_id=callback.from_user.id,
-                           default_locale=callback.from_user.language_code)
+        text = await t_for(key="admin_interactions.back_to_main", user_id=callback.from_user.id)
         await edit_message_safely(message=callback.message, text=text)
 
 

@@ -37,7 +37,7 @@ async def on_chat_member_update(message: Message):
                                                     user_id=member.user.id,
                                                     first_name=member.user.first_name,
                                                     last_name=member.user.last_name, username=member.user.username,
-                                                    is_bot=member.user.is_bot,
+                                                    is_bot=member.user.is_bot, locale=member.user.language_code,
                                                     status="left" if member.status == "kicked" or member.status == "left" else "active",
                                                     role=member.status)
 

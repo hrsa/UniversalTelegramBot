@@ -15,6 +15,7 @@ from app.schemas.group_features import ChannelFeatures, GroupFeatures
 from app.schemas.literals import RewardType
 from app.services.group import GroupService
 from app.services.message import get_payment_counts
+from app.services.translation import t_for
 
 
 async def edit_message_safely(message: MaybeInaccessibleMessageUnion, text: str,
@@ -375,10 +376,15 @@ async def build_invitation_group_keyboard(groups: Sequence[Group], modify: bool 
 
 
 async def build_remove_payment_keyboard(announcement_id: int | Mapped[int], group_id: int | Mapped[int],
-                                        early_bird_only: bool = False) -> InlineKeyboardMarkup:
+                                        early_bird_only: bool = False,
+                                        locale: str | None = None) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    text = "⛔ I understand. Remove early bird payment ⛔" if early_bird_only else "⛔ I understand. Remove payment ⛔"
-    builder.button(text="⬅️ Back",
+    if early_bird_only:
+        text = await t_for(key="admin_interactions.manage_announcement.remove_early_bird_payment.confirmation_button")
+    else:
+        text = await t_for(key="admin_interactions.manage_announcement.remove_payment.confirmation_button")
+    back_button_text = await t_for(key="admin_interactions.buttons.back")
+    builder.button(text=back_button_text,
                    callback_data=AdminCallback(level=2, action=AdminMenuAction.manage_announcements,
                                                announcement_id=announcement_id,
                                                group_id=group_id).pack())

@@ -34,7 +34,7 @@ async def delete_group(session: AsyncSession, group_id: int) -> None:
 
 
 async def create_group(session: AsyncSession, group_id: int, group_type: GroupType | None = None,
-                       title: str | None = None,
+                       title: str | None = None, locale: str | None = None,
                        status: str | None = None, ) -> Group:
     group = await get_group(session=session, group_id=group_id)
     if group is not None:
@@ -43,6 +43,7 @@ async def create_group(session: AsyncSession, group_id: int, group_type: GroupTy
         id=group_id,
         type=group_type,
         title=title,
+        locale=locale,
         status=status if status is not None else "active"
     )
     session.add(group)

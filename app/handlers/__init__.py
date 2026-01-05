@@ -10,7 +10,8 @@ from app.handlers.stripe import router as stripe_router
 from app.handlers.telegram import router as telegram_router
 
 
-all_routers = [common_router, member_watch_router, group_interactions_router, admin_interactions_router,
-               message_interactions_router, greeting_watch_router, manage_announcement_router, create_announcement_router]
+all_routers = [admin_interactions_router, manage_announcement_router, create_announcement_router,
+               message_interactions_router, greeting_watch_router,
+               member_watch_router, group_interactions_router, common_router]
 
 api_routers = [stripe_router, telegram_router]

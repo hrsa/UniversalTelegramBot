@@ -16,12 +16,16 @@ user_service = UserService(async_session_maker)
 group_permission_service = GroupPermissionService(async_session_maker)
 group_member_service = GroupMemberService(async_session_maker, group_service, user_service)
 
+
 @broker.subscriber("events.get_group_admins")
 async def on_get_group_admins(event: GetGroupAdminsEvent):
     admins = await bot.get_chat_administrators(event.group_id)
     for admin in admins:
         if not admin.user.id == bot.id:
             await group_member_service.get_or_create_member(group_id=event.group_id, user_id=admin.user.id,
-                                                        first_name=admin.user.first_name,
-                                                        last_name=admin.user.last_name, username=admin.user.username,
-                                                        is_bot=admin.user.is_bot, status="active", role=admin.status)
+                                                            first_name=admin.user.first_name,
+                                                            last_name=admin.user.last_name,
+                                                            username=admin.user.username,
+                                                            locale=admin.user.language_code,
+                                                            is_bot=admin.user.is_bot, status="active",
+                                                            role=admin.status)

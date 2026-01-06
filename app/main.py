@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 import i18n
 from fastapi import FastAPI
 from loguru import logger
+from starlette.requests import Request
 
 from app.bot.core import dp, bot
 from app.config import settings
@@ -11,6 +12,7 @@ from app.events.emitter import redis_broker
 from app.events.listeners import all_listeners
 from app.handlers import all_routers, api_routers
 from app.scheduler.setup import setup_scheduler, scheduler
+from app.services.ai import AIService
 
 
 @asynccontextmanager
@@ -61,4 +63,3 @@ if settings.ENV == "production":
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
-

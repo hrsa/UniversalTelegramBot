@@ -11,8 +11,9 @@ from app.schemas.callbacks import AdminCallback, AdminMenuAction
 from app.schemas.states import AdminPanel, Announcement
 from app.helpers.admin_interactions import edit_message_safely, build_confirm_announcement_keyboard, \
     build_confirm_pin_keyboard, delete_messages_safely, build_skip_button, build_reward_type_keyboard, \
-    build_invitation_group_keyboard, build_main_features_keyboard
+    build_invitation_group_keyboard, build_main_features_keyboard, build_confirm_ai_vs_human_announcement_keyboard
 from app.services.admin import AdminService
+from app.services.ai import AIService
 from app.services.group import GroupService
 from app.services.group_permission import GroupPermissionService
 from app.services.message import MessageService
@@ -50,13 +51,27 @@ async def show_confirmation_dialogue(message: Message, state: FSMContext):
     keyboard = await build_confirm_announcement_keyboard(group_id)
     confirm_announcement_text = await t_for(key="admin_interactions.create_announcement.confirm_announcement",
                                             user_id=message.from_user.id)
-    confirmation_text = f"{confirm_announcement_text}\n\n<b>{message.text}</b>"
+    confirmation_text = f"{confirm_announcement_text}\n\n<blockquote>{message.text}</blockquote>"
     await bot.send_message(message.chat.id, text=confirmation_text, reply_markup=keyboard)
     await state.set_state(Announcement.confirming_announcement)
 
 
 @router.callback_query(Announcement.confirming_announcement,
+                       AdminCallback.filter((F.action == AdminMenuAction.rewrite_announcement) & F.level == 2))
+async def rewrite_announcement(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
+    original_text = await state.get_value("announcement_text")
+    ai_service = AIService()
+    rewritten_text = await ai_service.rewrite_announcement(original_text=original_text)
+    await state.update_data(ai_announcement_text=rewritten_text)
+    final_text = f"Original announcement: <blockquote>{original_text}</blockquote>\n\nAI version: <blockquote>{rewritten_text}</blockquote>"
+    keyboard = await build_confirm_ai_vs_human_announcement_keyboard(callback_data.group_id)
+    await edit_message_safely(message=callback.message, text=final_text, reply_markup=keyboard)
+
+
+@router.callback_query(Announcement.confirming_announcement,
                        AdminCallback.filter((F.action == AdminMenuAction.confirm_announcement) & F.level == 2))
+@router.callback_query(Announcement.confirming_announcement,
+                       AdminCallback.filter((F.action == AdminMenuAction.confirm_ai_announcement) & F.level == 2))
 async def send_announcement(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
     group_id = await state.get_value("group_id")
 
@@ -64,7 +79,14 @@ async def send_announcement(callback: CallbackQuery, callback_data: AdminCallbac
         group_id, "allow_payments")
     can_pin_announcements = await group_permission_service.check_permission(group_id, "can_pin_messages")
 
-    announcement_text = await state.get_value("announcement_text")
+    if callback_data.action == AdminMenuAction.confirm_announcement:
+        announcement_text = await state.get_value("announcement_text")
+    elif callback_data.action == AdminMenuAction.confirm_ai_announcement:
+        announcement_text = await state.get_value("ai_announcement_text")
+    else:
+        logger.error(f"Invalid action in send_announcement: {callback_data.action}")
+        return
+
     announcement = await bot.send_message(chat_id=group_id, text=announcement_text)
     if not announcement:
         failed_to_send_text = await t_for(key="admin_interactions.create_announcement.failed_to_send_announcement",
@@ -130,8 +152,9 @@ async def add_main_payment_product(message: Message, state: FSMContext):
         payment_added_text = await t_for(key="admin_interactions.create_announcement.payment.main_payment_added",
                                          user_id=message.from_user.id,
                                          product=stripe_product.name)
-        early_bird_dialogue_text = await t_for(key="admin_interactions.create_announcement.payment.add_early_bird_dialogue",
-                                               user_id=message.from_user.id)
+        early_bird_dialogue_text = await t_for(
+            key="admin_interactions.create_announcement.payment.add_early_bird_dialogue",
+            user_id=message.from_user.id)
         keyboard = await build_skip_button(announcement_id=announcement_id, group_id=group_id,
                                            action=AdminMenuAction.set_payment_expiration_date,
                                            button_name=dont_add_early_bird_text)

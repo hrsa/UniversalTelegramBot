@@ -13,8 +13,10 @@ from app.schemas.states import Announcement
 from app.helpers.admin_interactions import edit_message_safely, delete_messages_safely, build_skip_button, \
     build_reward_type_keyboard, \
     build_invitation_group_keyboard, build_announcement_mgmt_message, \
-    build_announcement_delete_confirmation, build_remove_payment_keyboard, build_participants_list
+    build_announcement_delete_confirmation, build_remove_payment_keyboard, build_participants_list, \
+    build_confirm_ai_vs_human_announcement_keyboard, build_modify_ai_vs_human_announcement_keyboard
 from app.services.admin import AdminService
+from app.services.ai import AIService
 from app.services.group import GroupService
 from app.services.group_permission import GroupPermissionService
 from app.services.message import MessageService
@@ -39,6 +41,31 @@ async def confirm_announcement_deletion(callback: CallbackQuery, callback_data: 
                                                      with_reward_groups=True, with_rewards=True)
     text, keyboard = await build_announcement_delete_confirmation(announcement, callback_data.announcement_offset)
     await edit_message_safely(message=callback.message, text=text, reply_markup=keyboard)
+
+
+@router.callback_query(Announcement.managing_announcements,
+                       AdminCallback.filter(F.action == AdminMenuAction.rewrite_announcement))
+async def rewrite_announcement(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
+    await callback.answer("🤖 Thinking... 🤖")
+    announcement = await message_service.get_message(group_id=callback_data.group_id,
+                                                     message_id=callback_data.announcement_id, with_payments=True,
+                                                     with_reward_groups=True, with_rewards=True)
+    ai_service = AIService()
+    rewritten_text = await ai_service.rewrite_announcement(original_text=announcement.text)
+    await state.update_data(ai_announcement_text=rewritten_text)
+    final_text = f"Original announcement: <blockquote>{announcement.text}</blockquote>\n\nAI version: <blockquote>{rewritten_text}</blockquote>"
+    keyboard = await build_modify_ai_vs_human_announcement_keyboard(group_id=callback_data.group_id,
+                                                                    announcement_id=callback_data.announcement_id,
+                                                                    offset=callback_data.announcement_offset)
+    await edit_message_safely(message=callback.message, text=final_text, reply_markup=keyboard)
+
+@router.callback_query(Announcement.managing_announcements, AdminCallback.filter(F.action == AdminMenuAction.confirm_ai_announcement))
+async def confirm_ai_rewrite(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
+    rewritten_text = await state.get_value("ai_announcement_text")
+    await message_service.update_text(group_id=callback_data.group_id, message_id=callback_data.announcement_id, text=rewritten_text)
+    await bot.edit_message_text(chat_id=callback_data.group_id, message_id=callback_data.announcement_id, text=rewritten_text)
+    await callback.answer("Announcement updated!")
+    await manage_announcements(callback, callback_data, state)
 
 
 @router.callback_query(Announcement.managing_announcements,
@@ -319,13 +346,15 @@ async def show_remove_payment_product_dialogue(callback: CallbackQuery, callback
                                 user_id=callback.from_user.id,
                                 limit=announcement.participants_limit)
         keyboard = await build_remove_payment_keyboard(announcement_id=announcement.message_id,
-                                                       group_id=callback_data.group_id, early_bird_only=False, locale=callback.from_user.language_code)
+                                                       group_id=callback_data.group_id, early_bird_only=False,
+                                                       locale=callback.from_user.language_code)
     else:
         text = await t_for(key="admin_interactions.manage_announcement.remove_early_bird_payment.main",
                            user_id=callback.from_user.id,
                            payment_product_id=announcement.early_bird_stripe_product_id)
         keyboard = await build_remove_payment_keyboard(announcement_id=announcement.message_id,
-                                                       group_id=callback_data.group_id, early_bird_only=True, locale=callback.from_user.language_code)
+                                                       group_id=callback_data.group_id, early_bird_only=True,
+                                                       locale=callback.from_user.language_code)
     await edit_message_safely(message=callback.message, text=text, reply_markup=keyboard)
 
 

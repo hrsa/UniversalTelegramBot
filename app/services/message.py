@@ -72,6 +72,10 @@ class MessageService:
         async with self.session() as session:
             await message_repo.delete_message(session, group_id=group_id, message_id=message_id)
 
+    async def update_text(self, group_id: int, message_id: int, text: str):
+        async with self.session() as session:
+            await message_repo.update_message(session, group_id=group_id, message_id=message_id, text=text)
+
     async def set_stripe_product_id(self, group_id: int, message_id: int, stripe_product_id: str):
         async with self.session() as session:
             await message_repo.update_message(session, group_id=group_id, message_id=message_id,

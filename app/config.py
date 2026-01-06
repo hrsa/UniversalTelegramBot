@@ -36,4 +36,11 @@ class Settings(BaseSettings):
     AWS_S3_REGION: str
     BACKUP_DIR: str
 
+    AI_PROVIDER: str = "openai"
+    AI_MODEL: str = "gpt-4.1-mini"
+    AI_TEMPERATURE: float = 0.3
+    AI_MAX_TOKENS: int = 512
+    OPENAI_API_KEY: str | None = None
+    OLLAMA_URL: str | None = None
+
 settings = Settings()

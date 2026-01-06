@@ -145,15 +145,46 @@ async def build_greeting_watch_text(group_id: int, username: str, group_service:
 
 async def build_confirm_announcement_keyboard(group_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    builder.button(text="Improve with AI 🤖",
+                   callback_data=AdminCallback(level=2, action=AdminMenuAction.rewrite_announcement,
+                                               group_id=group_id).pack())
+    builder.button(text="⬅️ Back",
+                   callback_data=AdminCallback(level=2, action=AdminMenuAction.back,
+                                               group_id=group_id).pack())
     builder.button(text="Confirm ✅",
+                   callback_data=AdminCallback(level=2, action=AdminMenuAction.confirm_announcement,
+                                               group_id=group_id).pack())
+    builder.adjust(1,2)
+    return builder.as_markup()
+
+async def build_confirm_ai_vs_human_announcement_keyboard(group_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="AI version 🤖",
+                   callback_data=AdminCallback(level=2, action=AdminMenuAction.confirm_ai_announcement,
+                                               group_id=group_id).pack())
+    builder.button(text="Human version 🌏",
                    callback_data=AdminCallback(level=2, action=AdminMenuAction.confirm_announcement,
                                                group_id=group_id).pack())
     builder.button(text="⬅️ Back",
                    callback_data=AdminCallback(level=2, action=AdminMenuAction.back,
                                                group_id=group_id).pack())
-    builder.adjust(1)
+    builder.adjust(2,1)
     return builder.as_markup()
 
+async def build_modify_ai_vs_human_announcement_keyboard(group_id: int, announcement_id: int, offset: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="AI version 🤖",
+                   callback_data=AdminCallback(level=2, action=AdminMenuAction.confirm_ai_announcement,
+                                               announcement_offset=offset,
+                                               announcement_id=announcement_id,
+                                               group_id=group_id).pack())
+    builder.button(text="Human version 🌏",
+                   callback_data=AdminCallback(level=2, action=AdminMenuAction.manage_announcements,
+                                               announcement_offset=offset,
+                                               announcement_id=announcement_id,
+                                               group_id=group_id).pack())
+    builder.adjust(1)
+    return builder.as_markup()
 
 async def build_confirm_pin_keyboard(group_id: int, announcement_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
@@ -195,6 +226,12 @@ async def build_announcement_mgmt_message(announcement: Message | None, group_id
                                                               announcement_offset=offset + 1,
                                                               group_id=group_id
                                                               ).pack())
+    builder.button(text="Improve with AI 🤖",
+                   callback_data=AdminCallback(level=2, action=AdminMenuAction.rewrite_announcement,
+                                               announcement_offset=offset,
+                                               announcement_id=announcement.message_id,
+                                               group_id=group_id).pack())
+
     if can_pin_announcements:
         builder.button(text="Un-pin 📌" if announcement.is_pinned else "Pin 📌",
                        callback_data=AdminCallback(level=2, action=AdminMenuAction.confirm_pin,
@@ -303,8 +340,9 @@ async def build_announcement_data(announcement: Message, header: str | None = No
     creation_date = announcement.created_at.strftime("%d.%m.%Y - %H:%M")
     expiration_date = announcement.payment_expires_at.strftime("%d.%m.%Y") if announcement.payment_expires_at else None
     text = f"{header}\n\n" if header else ""
-    text += (f"{creation_date}\n"
+    text += (f"<code>{creation_date}</code>\n\n"
              f"{announcement.text}\n\n")
+    text += "<code>"
     if expiration_date:
         text += f"<b>Payment expiration date</b>: {expiration_date if expiration_date else 'N/A'}"
     text += f"\n<b>Max participants</b>: {announcement.participants_limit if announcement.participants_limit else 'Unlimited'}"
@@ -327,6 +365,7 @@ async def build_announcement_data(announcement: Message, header: str | None = No
                  f"\n - {pending} pending"
                  f"\n - {waiting} waiting"
                  f"\n - {expired} expired")
+    text += "</code>"
     return text
 
 

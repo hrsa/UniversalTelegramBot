@@ -21,6 +21,7 @@ fr:
       payment_link_expired: |
         Ton lien de paiement a expiré et ne peut plus être utilisé.
         Clique à nouveau sur le message dans le groupe si tu veux toujours participer !
+        Attention, une autre personne peut prendre ta place maintenant.
       payment_available: |
         Bonne nouvelle, une place s'est libérée pour toi !
         Voici ton lien de paiement :      

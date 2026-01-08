@@ -41,6 +41,7 @@ ru:
       back: "⬅️ Назад"
 
     create_announcement:
+      select_topic: "Выбери чат группы, в котором сделаем объявление."
       enter_text: "Напиши <b>текст</b> объявления для %{group_name}."
       confirm_announcement: "Вот объявление, которое я отправлю:"
       failed_to_send_announcement: "Не удалось отправить объявление. Пожалуйста, попробуй ещё раз позже."

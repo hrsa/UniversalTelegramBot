@@ -20,6 +20,7 @@ class Announcement(StatesGroup):
     adding_payment_product = State()
     adding_early_bird_payment_product = State()
     modifying_early_bird_payment_product = State()
+    setting_announcement_group_topic = State()
     setting_button_name = State()
     setting_callback_title = State()
     setting_participants_limit = State()

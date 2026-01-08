@@ -12,6 +12,8 @@ class AdminMenuAction(str, Enum):
     set_value = 'sv'
     make_announcement = 'ma'
     manage_announcements = 'mga'
+    set_topic = 'st'
+    set_announcement_group = 'sgg'
     rewrite_announcement = 'ra'
     confirm_edit_announcement = 'cea'
     confirm_add_payment_product = 'cap'
@@ -73,6 +75,7 @@ class AdminCallback(CallbackData, prefix='ad'):
     action: AdminMenuAction
     announcement_id: int | None = None
     announcement_offset: int | None = None
+    topic_id: int | None = None
     group_id: int | None = None
     feature_name: GroupFeature| None = None
     reward_type: RewardType | None = None

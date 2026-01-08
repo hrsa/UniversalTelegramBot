@@ -41,6 +41,7 @@ en:
       back: "⬅️ Back"
 
     create_announcement:
+      select_topic: "Please select the topic where we'll make an announcement."
       enter_text: "Please enter the <b>text</b> of the announcement for %{group_name}."
       confirm_announcement: "Here is the announcement i'll send:"
       failed_to_send_announcement: "Failed to send announcement. Please try again later."

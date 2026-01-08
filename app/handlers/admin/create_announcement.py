@@ -1,3 +1,5 @@
+from typing import cast, Sequence
+
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -5,13 +7,15 @@ from loguru import logger
 
 from app.bot.core import bot
 from app.config import settings
+from app.db.models.group_topic import GroupTopic
 from app.db.session import async_session_maker
 from app.handlers.admin.admin_interactions import process_group_selection
 from app.schemas.callbacks import AdminCallback, AdminMenuAction
 from app.schemas.states import AdminPanel, Announcement
 from app.helpers.admin_interactions import edit_message_safely, build_confirm_announcement_keyboard, \
     build_confirm_pin_keyboard, delete_messages_safely, build_skip_button, build_reward_type_keyboard, \
-    build_invitation_group_keyboard, build_main_features_keyboard, build_confirm_ai_vs_human_announcement_keyboard
+    build_invitation_group_keyboard, build_main_features_keyboard, build_confirm_ai_vs_human_announcement_keyboard, \
+    build_topics_selection_keyboard
 from app.services.admin import AdminService
 from app.services.ai import AIService
 from app.services.group import GroupService
@@ -32,14 +36,26 @@ stripe_payment_service = StripePaymentService()
 
 @router.callback_query(AdminPanel.managing_features,
                        AdminCallback.filter(F.action == AdminMenuAction.make_announcement))
-async def set_announcement_text(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
+async def select_group_topic(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
     group = await group_service.get_group(callback_data.group_id)
-    await state.update_data(group_id=callback_data.group_id, message_id=callback.message.message_id)
-    await state.set_state(Announcement.creating_announcement)
-    text = await t_for(key="admin_interactions.create_announcement.enter_text",
+    if group.topics:
+        topics = await group_service.get_topics(callback_data.group_id)
+        keyboard = await build_topics_selection_keyboard(topics=topics, group_id=callback_data.group_id)
+        text = await t_for(key="admin_interactions.create_announcement.select_topic",
+                           user_id=callback.from_user.id)
+        return await edit_message_safely(message=callback.message, text=text, reply_markup=keyboard)
+    else:
+        return await set_announcement_text(callback=callback, callback_data=callback_data, state=state)
+
+@router.callback_query(AdminPanel.managing_features, AdminCallback.filter(F.action == AdminMenuAction.set_topic))
+async def set_announcement_text(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
+        await state.update_data(topic_id=callback_data.topic_id, group_id=callback_data.group_id, message_id=callback.message.message_id)
+        await state.set_state(Announcement.creating_announcement)
+        group = await group_service.get_group(callback_data.group_id)
+        text = await t_for(key="admin_interactions.create_announcement.enter_text",
                        user_id=callback.from_user.id,
                        group_name=group.title)
-    await edit_message_safely(message=callback.message, text=text)
+        await edit_message_safely(message=callback.message, text=text)
 
 
 @router.message(Announcement.creating_announcement, F.text)
@@ -74,6 +90,7 @@ async def rewrite_announcement(callback: CallbackQuery, callback_data: AdminCall
                        AdminCallback.filter((F.action == AdminMenuAction.confirm_ai_announcement) & F.level == 2))
 async def send_announcement(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
     group_id = await state.get_value("group_id")
+    topic_id = await state.get_value("topic_id")
 
     can_add_payments = callback.from_user.id == settings.ADMIN_TELEGRAM_ID and await group_service.feature_is_active(
         group_id, "allow_payments")
@@ -87,7 +104,7 @@ async def send_announcement(callback: CallbackQuery, callback_data: AdminCallbac
         logger.error(f"Invalid action in send_announcement: {callback_data.action}")
         return
 
-    announcement = await bot.send_message(chat_id=group_id, text=announcement_text)
+    announcement = await bot.send_message(chat_id=group_id, message_thread_id=topic_id, text=announcement_text)
     if not announcement:
         failed_to_send_text = await t_for(key="admin_interactions.create_announcement.failed_to_send_announcement",
                                           user_id=callback.from_user.id)

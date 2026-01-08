@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped
 
 from app.bot.core import bot
 from app.db.models.group import Group
+from app.db.models.group_topic import GroupTopic
 from app.db.models.message import Message
 from app.db.models.payment import Payment
 from app.schemas.callbacks import AdminCallback, AdminMenuAction, GroupFeature
@@ -21,7 +22,10 @@ from app.services.translation import t_for
 async def edit_message_safely(message: MaybeInaccessibleMessageUnion, text: str,
                               reply_markup: InlineKeyboardMarkup | None = None):
     try:
-        return await message.edit_text(text=text, reply_markup=reply_markup, parse_mode="HTML")
+        if reply_markup is not None:
+            return await message.edit_text(text=text, reply_markup=reply_markup, parse_mode="HTML")
+        else:
+            return await message.edit_text(text=text, parse_mode="HTML")
     except TelegramBadRequest as e:
         if "message is not modified" in str(e):
             logger.warning(e)
@@ -154,8 +158,9 @@ async def build_confirm_announcement_keyboard(group_id: int) -> InlineKeyboardMa
     builder.button(text="Confirm ✅",
                    callback_data=AdminCallback(level=2, action=AdminMenuAction.confirm_announcement,
                                                group_id=group_id).pack())
-    builder.adjust(1,2)
+    builder.adjust(1, 2)
     return builder.as_markup()
+
 
 async def build_confirm_ai_vs_human_announcement_keyboard(group_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
@@ -168,10 +173,12 @@ async def build_confirm_ai_vs_human_announcement_keyboard(group_id: int) -> Inli
     builder.button(text="⬅️ Back",
                    callback_data=AdminCallback(level=2, action=AdminMenuAction.back,
                                                group_id=group_id).pack())
-    builder.adjust(2,1)
+    builder.adjust(2, 1)
     return builder.as_markup()
 
-async def build_modify_ai_vs_human_announcement_keyboard(group_id: int, announcement_id: int, offset: int) -> InlineKeyboardMarkup:
+
+async def build_modify_ai_vs_human_announcement_keyboard(group_id: int, announcement_id: int,
+                                                         offset: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="AI version 🤖",
                    callback_data=AdminCallback(level=2, action=AdminMenuAction.confirm_ai_announcement,
@@ -185,6 +192,7 @@ async def build_modify_ai_vs_human_announcement_keyboard(group_id: int, announce
                                                group_id=group_id).pack())
     builder.adjust(1)
     return builder.as_markup()
+
 
 async def build_confirm_pin_keyboard(group_id: int, announcement_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
@@ -369,6 +377,18 @@ async def build_announcement_data(announcement: Message, header: str | None = No
     return text
 
 
+async def build_topics_selection_keyboard(topics: Sequence[GroupTopic], group_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="General", callback_data=AdminCallback(level=2, action=AdminMenuAction.set_topic,
+                                                               topic_id=None, group_id=group_id).pack())
+    for topic in topics:
+        builder.button(text=topic.name, callback_data=AdminCallback(level=2, action=AdminMenuAction.set_topic,
+                                                                    topic_id=topic.topic_id,
+                                                                    group_id=topic.group_id).pack())
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 async def build_skip_button(announcement_id: int, group_id: int, action: AdminMenuAction,
                             button_name: str | None = None) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
@@ -377,7 +397,6 @@ async def build_skip_button(announcement_id: int, group_id: int, action: AdminMe
                    callback_data=AdminCallback(level=2, action=action,
                                                announcement_id=announcement_id,
                                                group_id=group_id).pack())
-
     return builder.as_markup()
 
 

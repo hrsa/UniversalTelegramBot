@@ -63,7 +63,10 @@ async def rewrite_announcement(callback: CallbackQuery, callback_data: AdminCall
 async def confirm_ai_rewrite(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
     rewritten_text = await state.get_value("ai_announcement_text")
     await message_service.update_text(group_id=callback_data.group_id, message_id=callback_data.announcement_id, text=rewritten_text)
-    await bot.edit_message_text(chat_id=callback_data.group_id, message_id=callback_data.announcement_id, text=rewritten_text)
+    try:
+        await bot.edit_message_text(chat_id=callback_data.group_id, message_id=callback_data.announcement_id, text=rewritten_text)
+    except Exception as e:
+        logger.error(f"Error when editing message (id: {callback_data.announcement_id}, group: {callback_data.group_id}): {e}")
     await callback.answer("Announcement updated!")
     await manage_announcements(callback, callback_data, state)
 

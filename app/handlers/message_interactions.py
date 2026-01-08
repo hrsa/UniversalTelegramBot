@@ -100,7 +100,7 @@ async def on_join_announcement(callback: CallbackQuery, callback_data: Announcem
 
 
 @router.message(F.text)
-async def add_group_member_if_necessary(message: Message):
+async def update_group_members_and_group_topics(message: Message):
     group_type = cast(GroupType, message.chat.type) if message.chat.type is not None else None
 
     if group_type != "private":

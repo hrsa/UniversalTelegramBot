@@ -54,6 +54,16 @@ async def on_chat_member_update(message: Message):
             await user_service.notify_admins(f"User @{member.user.username} left '{group.title}'", group.id)
 
 
+@router.message(F.left_chat_participant)
+async def left_chat_participant_message(message: Message):
+    if message.left_chat_member.id == bot.id:
+        await group_service.leave_group(message.chat.id)
+    else:
+        group = await group_service.get_group(message.chat.id)
+        if await group_service.feature_is_active(message.chat.id, "report_leaving_members"):
+            await user_service.notify_admins(f"User @{message.left_chat_member.username} left '{group.title}'", group.id)
+
+
 @router.message(F.text.contains("#"), ~StateFilter(AdminPanel))
 async def react_to_greeting(message: Message):
     if not await group_service.feature_is_active(message.chat.id, "greeting_watch"):

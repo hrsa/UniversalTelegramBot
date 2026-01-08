@@ -133,3 +133,9 @@ async def check_permission(session: AsyncSession, group_id: int, permission: str
     group_permission = await get_or_create_group_permission(session, group_id)
 
     return getattr(group_permission, permission, False)
+
+async def delete_permissions(session: AsyncSession, group_id: int):
+    group_permission = await get_or_create_group_permission(session, group_id)
+    await session.delete(group_permission)
+    await session.commit()
+    await session.refresh(group_permission)

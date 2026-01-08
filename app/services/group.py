@@ -11,6 +11,7 @@ from app.db.models.message import Message
 from app.db.repositories import group as group_repo
 from app.db.repositories import message as message_repo
 from app.db.repositories import group_topic as group_topic_repo
+from app.db.repositories import group_permission as group_permission_repo
 from app.schemas.group_features import GroupFeatures, ChannelFeatures
 from app.schemas.literals import FeatureFlag, GroupType, GroupStatus
 
@@ -67,7 +68,10 @@ class GroupService:
         return group
 
     async def leave_group(self, group_id: int) -> Group:
-        return await self.update_group(group_id, status="left")
+        group = await self.update_group(group_id, status="left")
+        async with self.session() as session:
+            await group_permission_repo.delete_permissions(session, group_id)
+        return group
 
     async def update_group_title(self, group_id: int, title: str) -> Group:
         return await self.update_group(group_id, title=title)

@@ -113,3 +113,6 @@ async def add_group_member_if_necessary(message: Message):
                                                         username=message.from_user.username,
                                                         locale=message.from_user.language_code,
                                                         is_bot=message.from_user.is_bot)
+
+    if message.is_topic_message:
+        await group_service.get_or_create_topic(group_id=message.chat.id, topic_id=message.message_thread_id, topic_name=message.reply_to_message.forum_topic_created.name)

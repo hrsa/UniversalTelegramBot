@@ -38,6 +38,7 @@ class Group(Base):
     permissions: Mapped[Optional["GroupPermission"]] = relationship("GroupPermission", back_populates="group", cascade="all, delete-orphan")
     messages: Mapped[Optional[List["Message"]]] = relationship("Message", back_populates="group", cascade="all, delete-orphan")
     rewards: Mapped[Optional[List["Reward"]]] = relationship("Reward", back_populates="group", cascade="all, delete-orphan")
+    topics: Mapped[Optional[List["GroupTopic"]]] = relationship("GroupTopic", back_populates="group", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Group(id={self.id}, type={self.type} title={self.title}, created_at={self.created_at})>"

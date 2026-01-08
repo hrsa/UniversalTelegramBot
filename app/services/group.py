@@ -6,9 +6,11 @@ from sqlalchemy.orm import Mapped
 
 from app.bot.core import bot
 from app.db.models.group import Group
+from app.db.models.group_topic import GroupTopic
 from app.db.models.message import Message
 from app.db.repositories import group as group_repo
 from app.db.repositories import message as message_repo
+from app.db.repositories import group_topic as group_topic_repo
 from app.schemas.group_features import GroupFeatures, ChannelFeatures
 from app.schemas.literals import FeatureFlag, GroupType, GroupStatus
 
@@ -43,6 +45,14 @@ class GroupService:
         async with self.session() as session:
             group = await group_repo.create_group(session, group_id, group_type, title, status)
         return group
+
+    async def get_topics(self, group_id: int) -> Sequence[GroupTopic]:
+        async with self.session() as session:
+            return await group_repo.get_group_topics(session, group_id)
+
+    async def get_or_create_topic(self, group_id: int, topic_id: int, topic_name: str | None = None) -> GroupTopic:
+        async with self.session() as session:
+            return await group_topic_repo.get_or_create_topic(session=session, group_id=group_id, topic_id=topic_id, name=topic_name)
 
     async def update_group(self, group_id: int, new_group_id: int | None = None, title: str | None = None,
                            group_type: GroupType | None = None, status: GroupStatus | None = None,

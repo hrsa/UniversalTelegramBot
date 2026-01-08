@@ -1,8 +1,10 @@
 from typing import Sequence
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
 from app.db.models.group import Group
+from app.db.models.group_topic import GroupTopic
 from app.schemas.literals import GroupStatus, GroupType
 
 
@@ -21,8 +23,12 @@ async def get_or_create_group(
 
 
 async def get_group(session: AsyncSession, group_id: int) -> Group | None:
-    result = await session.execute(select(Group).where(Group.id == group_id))
+    result = await session.execute(select(Group).options(selectinload(Group.topics)).where(Group.id == group_id))
     return result.scalar_one_or_none()
+
+async def get_group_topics(session: AsyncSession, group_id: int) -> Sequence[GroupTopic] | None:
+    result = await session.execute(select(GroupTopic).where(GroupTopic.group_id == group_id))
+    return result.scalars().all()
 
 async def delete_group(session: AsyncSession, group_id: int) -> None:
     stmt = select(Group).where(Group.id == group_id)

@@ -1,5 +1,7 @@
 from loguru import logger
 from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.orm import Mapped
+
 from app.db.repositories import user as user_repo
 from app.bot.core import bot
 
@@ -31,11 +33,11 @@ class UserService:
                                                       last_name=last_name, username=username, is_bot=is_bot, user_locale=locale)
         return user
 
-    async def get_group_admins(self, group_id: int):
+    async def get_group_admins(self, group_id: int | Mapped[int]):
         async with self.session() as session:
             return await user_repo.get_group_admins(session, group_id)
 
-    async def notify_admins(self, message: str, group_id: int):
+    async def notify_admins(self, message: str, group_id: int | Mapped[int]):
         admins = await self.get_group_admins(group_id)
         for admin in admins:
             await notify_user(user_id=admin.id, message=message)

@@ -36,9 +36,8 @@ class GroupMemberService:
     async def leave_group(self, group_id: int, user_id: int):
         async with self.session() as session:
             await self.get_or_create_member(group_id, user_id)
-            group_member = await self.group_member_repo.set_member_status(session, group_id=group_id, user_id=user_id,
+            return await self.group_member_repo.set_member_status(session, group_id=group_id, user_id=user_id,
                                                                           status="left")
-        return group_member
 
     async def member_has_greeting(self, group_id: int, user_id: int):
         group_member = await self.get_or_create_member(group_id, user_id)

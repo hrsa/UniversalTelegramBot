@@ -26,9 +26,11 @@ async def get_group(session: AsyncSession, group_id: int) -> Group | None:
     result = await session.execute(select(Group).options(selectinload(Group.topics)).where(Group.id == group_id))
     return result.scalar_one_or_none()
 
+
 async def get_group_topics(session: AsyncSession, group_id: int) -> Sequence[GroupTopic] | None:
     result = await session.execute(select(GroupTopic).where(GroupTopic.group_id == group_id))
     return result.scalars().all()
+
 
 async def delete_group(session: AsyncSession, group_id: int) -> None:
     stmt = select(Group).where(Group.id == group_id)
@@ -109,11 +111,8 @@ async def get_user_groups(session: AsyncSession, user_id: int) -> Sequence[Group
 
 async def get_groups_managed_by_user(session: AsyncSession, user_id: int) -> Sequence[Group]:
     result = await session.execute(select(Group)
-    .where(
-        (Group.members.any(user_id=user_id))
-        &
-        (Group.members.any(is_active_admin=True))
-    ))
+                                   .options(selectinload(Group.members))
+                                   .where(Group.members.any(user_id=user_id, is_active_admin=True)))
     groups = result.scalars().all()
     return groups
 
@@ -121,11 +120,10 @@ async def get_groups_managed_by_user(session: AsyncSession, user_id: int) -> Seq
 async def get_groups_eligible_for_invitation(session: AsyncSession, user_id: int, main_group_id: int) -> Sequence[
     Group]:
     stmt = (select(Group)
+            .options(selectinload(Group.members))
             .where(Group.type.in_({"supergroup", "group"}))
             .where(Group.id != main_group_id)
-            .where((Group.members.any(user_id=user_id))
-                   &
-                   (Group.members.any(is_active_admin=True)))
+            .where(Group.members.any(user_id=user_id, is_active_admin=True))
             .where(Group.permissions.has(can_invite_users=True))
             )
     result = await session.execute(stmt)

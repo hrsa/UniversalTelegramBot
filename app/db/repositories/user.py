@@ -14,19 +14,20 @@ async def get_or_create_user(
         first_name: str | None = None,
         last_name: str | None = None,
         username: str | None = None,
+        email: str | None = None,
         user_locale: str | None = None,
         is_bot: bool | None = None,
 ) -> User:
     user = await get_user(session=session, user_id=user_id)
     if user is None:
         user = await create_user(session=session, user_id=user_id, first_name=first_name, last_name=last_name,
-                                 username=username, user_locale=user_locale, is_bot=is_bot)
+                                 username=username, user_locale=user_locale, is_bot=is_bot, email=email)
     return user
 
 
 async def create_user(session: AsyncSession, user_id: int, first_name: str | None = None, last_name: str | None = None,
-                      username: str | None = None, user_locale: str | None = None, is_bot: bool = False) -> User:
-    user = User(id=user_id, first_name=first_name, last_name=last_name, username=username,
+                      username: str | None = None, email: str | None = None, user_locale: str | None = None, is_bot: bool = False) -> User:
+    user = User(id=user_id, first_name=first_name, last_name=last_name, username=username, email=email,
                 locale=user_locale if user_locale is not None else "ru", is_bot=is_bot)
     session.add(user)
     await session.commit()
@@ -40,7 +41,7 @@ async def get_user(session: AsyncSession, user_id: int) -> User | None:
 
 
 async def update_user(session: AsyncSession, user_id: int, first_name: str | None = None, last_name: str | None = None,
-                      username: str | None = None, user_locale: str | None = None, is_bot: bool | None = None) -> User:
+                      username: str | None = None, email: str | None = None, user_locale: str | None = None, is_bot: bool | None = None) -> User:
     user = await get_user(session, user_id)
     if user is None:
         raise ValueError(f"User with id {user_id} not found")
@@ -52,6 +53,8 @@ async def update_user(session: AsyncSession, user_id: int, first_name: str | Non
         user.username = username
     if locale is not None:
         user.locale = user_locale
+    if email is not None:
+        user.email = email
     if is_bot is not None:
         user.is_bot = is_bot
     await session.commit()

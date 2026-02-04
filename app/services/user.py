@@ -27,11 +27,18 @@ class UserService:
         self.session = session
 
     async def get_or_create_user(self, user_id: int, first_name: str | None = None, last_name: str | None = None,
-                                 username: str | None = None, is_bot: bool | None = None, locale: str | None = None):
+                                 username: str | None = None, email: str | None = None, is_bot: bool | None = None, locale: str | None = None):
         async with self.session() as session:
-            user = await user_repo.get_or_create_user(session, user_id=user_id, first_name=first_name,
+            user = await user_repo.get_or_create_user(session, user_id=user_id, first_name=first_name, email=email,
                                                       last_name=last_name, username=username, is_bot=is_bot, user_locale=locale)
         return user
+
+    async def update_user(self, user_id: int, first_name: str | None = None, last_name: str | None = None,
+                      username: str | None = None, email: str | None = None, user_locale: str | None = None, is_bot: bool | None = None):
+        async with self.session() as session:
+            user = await user_repo.update_user(session=session, user_id=user_id, first_name=first_name, last_name=last_name,
+                      username=username, email=email, user_locale=user_locale, is_bot=is_bot)
+            return user
 
     async def get_group_admins(self, group_id: int | Mapped[int]):
         async with self.session() as session:

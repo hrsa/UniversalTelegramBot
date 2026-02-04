@@ -1,4 +1,5 @@
 from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.orm import Mapped
 
 from app.db.models.group_permission import GroupPermission
 from app.db.repositories import group_permission as gp_repo
@@ -44,7 +45,7 @@ class GroupPermissionService:
 
         return group_permission
 
-    async def check_permission(self, group_id: int, permission: PermissionFlag) -> bool:
+    async def check_permission(self, group_id: int | Mapped[int], permission: PermissionFlag) -> bool:
         async with self.session() as session:
             return await gp_repo.check_permission(session, group_id, permission)
 

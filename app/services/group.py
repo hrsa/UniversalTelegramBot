@@ -24,9 +24,7 @@ class GroupService:
                                   title: str | None = None,
                                   status: GroupStatus | None = None) -> Group:
         async with self.session() as session:
-            group = await group_repo.get_or_create_group(session, group_id, group_type, title, status)
-
-        return group
+            return await group_repo.get_or_create_group(session, group_id, group_type, title, status)
 
     async def get_active_groups(self) -> Sequence[Group]:
         async with self.session() as session:
@@ -44,8 +42,7 @@ class GroupService:
                            title: str | None = None,
                            status: GroupStatus | None = None) -> Group:
         async with self.session() as session:
-            group = await group_repo.create_group(session, group_id, group_type, title, status)
-        return group
+            return await group_repo.create_group(session, group_id, group_type, title, status)
 
     async def get_topics(self, group_id: int) -> Sequence[GroupTopic]:
         async with self.session() as session:
@@ -53,19 +50,19 @@ class GroupService:
 
     async def get_or_create_topic(self, group_id: int, topic_id: int, topic_name: str | None = None) -> GroupTopic:
         async with self.session() as session:
-            return await group_topic_repo.get_or_create_topic(session=session, group_id=group_id, topic_id=topic_id, name=topic_name)
+            return await group_topic_repo.get_or_create_topic(session=session, group_id=group_id, topic_id=topic_id,
+                                                              name=topic_name)
 
     async def update_group(self, group_id: int, new_group_id: int | None = None, title: str | None = None,
                            group_type: GroupType | None = None, status: GroupStatus | None = None,
                            greeting_hashtag: str | None = None,
                            greeting_message: str | None = None, reminder_message: str | None = None):
         async with self.session() as session:
-            group = await group_repo.update_group(session=session, group_id=group_id, new_group_id=new_group_id,
-                                                  title=title, group_type=group_type, status=status,
-                                                  greeting_hashtag=greeting_hashtag,
-                                                  greeting_message=greeting_message, reminder_message=reminder_message
-                                                  )
-        return group
+            return await group_repo.update_group(session=session, group_id=group_id, new_group_id=new_group_id,
+                                                 title=title, group_type=group_type, status=status,
+                                                 greeting_hashtag=greeting_hashtag,
+                                                 greeting_message=greeting_message, reminder_message=reminder_message
+                                                 )
 
     async def leave_group(self, group_id: int) -> Group:
         group = await self.update_group(group_id, status="left")
@@ -98,20 +95,8 @@ class GroupService:
         return reminder_message.replace("%USERNAME%", f"@{username}") if reminder_message else None
 
     async def get_group_announcements(self, group_id: int,
-                                      offset: int | None = None, limit: int | None = None,
-                                      with_rewards: bool = False, with_reward_groups: bool = False,
-                                      with_payments: bool = False) -> tuple[Sequence[Message], int]:
+                                      offset: int | None = None, limit: int | None = None) -> tuple[
+        Sequence[Message], int]:
         async with self.session() as session:
             return await message_repo.get_messages_for_group(session=session, group_id=group_id, offset=offset,
-                                                             limit=limit, with_rewards=with_rewards,
-                                                             with_reward_groups=with_reward_groups,
-                                                             with_payments=with_payments)
-
-    async def get_group_invite_link(self, group_id: int | Mapped[int], link_name: str | None = None) -> ChatInviteLink:
-        group = await self.get_or_create_group(group_id)
-        link = await bot.create_chat_invite_link(chat_id=group.id,
-                                                 member_limit=1,
-                                                 name=link_name if link_name else f"Join {group.title}"
-                                                 )
-
-        return link.invite_link
+                                                             limit=limit)

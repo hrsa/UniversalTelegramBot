@@ -1,10 +1,10 @@
 import sys
 from contextlib import asynccontextmanager
 
-import i18n
 from fastapi import FastAPI
 from loguru import logger
 
+import i18n
 from app.bot.core import dp, bot
 from app.config import settings
 from app.events.emitter import redis_broker

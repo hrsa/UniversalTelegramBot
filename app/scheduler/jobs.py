@@ -10,9 +10,7 @@ from app.events.schemas import MemberWithNoGreetingEvent, GetGroupAdminsEvent
 from app.services.group import GroupService
 from app.services.group_member import GroupMemberService
 from app.services.message import MessageService
-from app.services.payment import PaymentService
 from app.services.s3_backup import S3BackupService
-from app.services.stripe_payment import StripePaymentService
 from app.services.translation import t_for
 from app.services.user import UserService, notify_user
 
@@ -24,8 +22,6 @@ group_member_service = GroupMemberService(
     user_service
 )
 message_service = MessageService(async_session_maker)
-payment_service = PaymentService(async_session_maker, message_service)
-stripe_service = StripePaymentService()
 s3_backup_service = S3BackupService()
 
 
@@ -53,39 +49,6 @@ async def get_group_admins():
 
     for group in groups:
         await emit_event("get_group_admins", GetGroupAdminsEvent(group_id=group.id))
-
-
-async def check_expired_messages():
-    messages = await message_service.get_expired_messages()
-    for message in messages:
-        await message_service.remove_button_from_announcement(group_id=message.group_id, message_id=message.message_id)
-
-
-async def invalidate_old_pending_payments():
-    pending_payments = await payment_service.get_payments(status="pending")
-    for payment in pending_payments:
-        if payment.created_at < datetime.now(timezone.utc) - timedelta(minutes=15):
-            await stripe_service.disable_payment_link(payment.stripe_payment_id)
-            await payment_service.update_payment(user_id=payment.user_id, announcement_id=payment.message_id,
-                                                 status="expired")
-            payment_link_expired_text = await t_for(key="user_interactions.on_join.payment_link_expired", user_id=payment.user_id)
-            await notify_user(user_id=payment.user_id,
-                              message=payment_link_expired_text)
-
-
-async def activate_waiting_payments():
-    waiting_payments = await payment_service.get_payments(status="waiting")
-    for payment in waiting_payments:
-        is_full, pending = await payment_service.verify_event_capacity(payment.message_id)
-        if not is_full:
-            await payment_service.update_payment(user_id=payment.user_id, announcement_id=payment.message_id,
-                                                 status="pending", created_at=datetime.now(timezone.utc))
-            payment_available_text = await t_for(key="user_interactions.on_join.payment_available", user_id=payment.user_id,
-                                                 payment_link=payment.url)
-            disclaimer_text = await t_for(key="user_interactions.on_join.payment_link_disclaimer", user_id=payment.user_id)
-
-            await notify_user(user_id=payment.user_id,
-                              message=f"{payment_available_text}\n\n{disclaimer_text}")
 
 
 async def upload_backups_to_s3():

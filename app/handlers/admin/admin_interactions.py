@@ -2,6 +2,7 @@ from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.bot.core import bot
 from app.config import settings
@@ -41,7 +42,6 @@ async def start_command(message: Message, state: FSMContext):
                                user_id=message.from_user.id, name=message.from_user.full_name)
 
     keyboard = await build_group_selection_keyboard(my_groups)
-
     await bot.send_message(message.from_user.id, welcome_text, reply_markup=keyboard)
 
     await state.set_state(AdminPanel.choosing_group)
@@ -100,10 +100,11 @@ async def force_backup(message: Message, state: FSMContext):
 @router.callback_query(AdminPanel.choosing_group, AdminCallback.filter(F.action == AdminMenuAction.select_group))
 async def process_group_selection(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
     group_id = callback_data.group_id
+    if not group_id:
+        group_id = await state.get_value("group_id")
     group = await group_service.get_or_create_group(group_id)
     features = await group_service.get_features(group_id)
-    can_manage_payments = callback.from_user.id == settings.ADMIN_TELEGRAM_ID
-    keyboard = await build_main_features_keyboard(group_id, features, can_manage_payments)
+    keyboard = await build_main_features_keyboard(group_id, features)
     text = await t_for(key="admin_interactions.group_management.group_selected",
                        user_id=callback.from_user.id, title=group.title)
 
@@ -135,8 +136,7 @@ async def toggle_feature(callback: CallbackQuery, callback_data: AdminCallback, 
                                      user_id=callback.from_user.id,
                                      title=group.title)
         features = await group_service.get_features(group_id)
-        keyboard = await build_main_features_keyboard(group_id, features,
-                                                      callback.from_user.id == settings.ADMIN_TELEGRAM_ID)
+        keyboard = await build_main_features_keyboard(group_id, features)
         await edit_message_safely(message=callback.message, text=f"{feature_updated}\n\n{group_selected}",
                                   reply_markup=keyboard)
 

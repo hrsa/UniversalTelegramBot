@@ -6,7 +6,6 @@ FeatureFlag = Literal[
     "max_warning_count",
     "report_new_members",
     "report_leaving_members",
-    "allow_payments"
 ]
 
 PermissionFlag = Literal[
@@ -19,6 +18,3 @@ UserRole = Literal["member", "administrator", "creator", "kicked"]
 UserStatus = Literal["active", "left"]
 GroupStatus = Literal["active", "left"]
 GroupType = Literal["channel", "supergroup", "private", "group"]
-PaymentStatus = Literal["pending", "paid", "waiting", "failed", "expired"]
-
-RewardType = Literal["message", "invite"]

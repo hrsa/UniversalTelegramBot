@@ -12,10 +12,11 @@ pydantic-settings
 loguru
 stripe
 boto3
-python-i18n
-i18n
+i18nice[YAML]
 pyyaml
 langchain-core
 langchain-anthropic
 langchain-groq
 langchain-ollama
+langchain-openai
+botocore

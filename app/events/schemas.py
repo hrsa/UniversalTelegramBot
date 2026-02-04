@@ -17,3 +17,4 @@ class PaymentReceivedEvent(BaseEvent):
     user_id: int
     payment_link_id: str
     amount: int
+    email: str | None = None

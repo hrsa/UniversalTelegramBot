@@ -20,20 +20,20 @@ def setup_scheduler():
         CronTrigger(hour=1, minute=00, timezone=timezone.utc)
     )
 
-    scheduler.add_job(
-        jobs.check_expired_messages,
-        CronTrigger(hour=0, minute=0, timezone=timezone.utc)
-    )
-
-    scheduler.add_job(
-        jobs.invalidate_old_pending_payments,
-        IntervalTrigger(minutes=1, timezone=timezone.utc)
-    )
-
-    scheduler.add_job(
-        jobs.activate_waiting_payments,
-        IntervalTrigger(minutes=1, timezone=timezone.utc)
-    )
+    # scheduler.add_job(
+    #     jobs.check_expired_messages,
+    #     CronTrigger(hour=0, minute=0, timezone=timezone.utc)
+    # )
+    #
+    # scheduler.add_job(
+    #     jobs.invalidate_old_pending_payments,
+    #     IntervalTrigger(minutes=1, timezone=timezone.utc)
+    # )
+    #
+    # scheduler.add_job(
+    #     jobs.activate_waiting_payments,
+    #     IntervalTrigger(minutes=1, timezone=timezone.utc)
+    # )
 
     scheduler.add_job(
         jobs.upload_backups_to_s3,

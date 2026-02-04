@@ -17,10 +17,12 @@ async def stripe_webhook(request: Request):
     try:
         event = Webhook.construct_event(payload=await request.body(), sig_header=stripe_signature, secret=settings.STRIPE_SIGNING_SECRET)
         if event.type == "checkout.session.completed":
+            logger.warning(event)
             user_id = event.data.object.metadata.get("user_id", None)
             payment_id = event.data.object.payment_link
             amount = event.data.object.amount_total
-            await emit_event("payment_received", PaymentReceivedEvent(user_id=user_id, payment_link_id=payment_id, amount=amount))
+            email = event.data.object.customer_details.email if event.data.object.customer_details.email else None
+            await emit_event("payment_received", PaymentReceivedEvent(user_id=user_id, payment_link_id=payment_id, amount=amount, email=email))
     except ValueError:
         logger.error("Error while decoding event")
         return {"status": "Error while decoding event", "code": 400}

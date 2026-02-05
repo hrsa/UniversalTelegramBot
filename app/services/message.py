@@ -64,7 +64,7 @@ class MessageService:
                                                      topic_id=topic_id, is_published=is_published, text=text,
                                                      picture=picture, is_pinned=is_pinned)
 
-    async def add_buttons_to_announcement(self, group_id: int, message_id: int):
+    async def add_buttons_to_announcement(self, group_id: int | Mapped[int], message_id: int | Mapped[int]):
         message = await self.get_message(group_id=group_id, message_id=message_id)
         if message is None:
             raise ValueError(f"Message with id {message_id} not found in group {group_id}")
@@ -75,7 +75,7 @@ class MessageService:
         if buttons:
             for button in buttons:
                 builder.button(text=button.text, url=button.link)
-
+        builder.adjust(1)
         try:
             await bot.edit_message_reply_markup(chat_id=group_id, message_id=message_id,
                                                 reply_markup=builder.as_markup())

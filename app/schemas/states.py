@@ -18,7 +18,6 @@ class Announcement(StatesGroup):
     adding_announcement_picture = State()
     confirming_announcement = State()
     sending_announcement = State()
-    adding_button = State()
     setting_button_name = State()
     setting_button_link = State()
     setting_announcement_group_topic = State()

@@ -45,7 +45,7 @@ class Message(Base):
 
     group: Mapped["Group"] = relationship("Group", back_populates="messages")
     topic: Mapped["GroupTopic"] = relationship("GroupTopic", back_populates="messages")
-    buttons: Mapped[List["Button"]] = relationship("Button", back_populates="message")
+    buttons: Mapped[List["Button"]] = relationship("Button", back_populates="message", cascade="all, delete-orphan", passive_deletes=True)
 
     def __repr__(self):
         return (

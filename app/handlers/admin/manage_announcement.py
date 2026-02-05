@@ -79,17 +79,12 @@ async def manage_announcements(callback: CallbackQuery, callback_data: AdminCall
     await state.set_state(Announcement.managing_announcements)
     offset = callback_data.announcement_offset if callback_data.announcement_offset is not None else 0
     limit = 1
-    can_add_payments = callback.from_user.id == settings.ADMIN_TELEGRAM_ID and await group_service.feature_is_active(
-        callback_data.group_id, "allow_payments")
     can_pin_announcements = await group_permission_service.check_permission(callback_data.group_id, "can_pin_messages")
 
     announcements, count = await group_service.get_group_announcements(group_id=callback_data.group_id, offset=offset,
-                                                                       limit=limit,
-                                                                       with_payments=True, with_reward_groups=True,
-                                                                       with_rewards=True)
+                                                                       limit=limit)
     text, keyboard = await build_announcement_mgmt_message(announcement=announcements[0] if announcements else None,
                                                            group_id=callback_data.group_id, count=count, offset=offset,
-                                                           can_add_payments=can_add_payments,
                                                            can_pin_announcements=can_pin_announcements)
     await edit_message_safely(message=callback.message, text=text, reply_markup=keyboard)
 

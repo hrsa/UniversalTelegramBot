@@ -197,8 +197,7 @@ async def build_confirm_pin_keyboard(group_id: int, announcement_id: int) -> Inl
 
 
 async def build_announcement_mgmt_message(announcement: Message | None, group_id: int, count: int,
-                                          offset: int, can_add_payments: bool | None = False,
-                                          can_pin_announcements: bool | None = False) -> tuple[
+                                          offset: int, can_pin_announcements: bool | None = False) -> tuple[
     str, InlineKeyboardMarkup]:
     builder = InlineKeyboardBuilder()
     if not announcement:
@@ -299,20 +298,21 @@ async def build_topics_selection_keyboard(topics: Sequence[GroupTopic], group_id
     return builder.as_markup()
 
 
-async def build_yes_no_keyboard(yes_text: str, yes_action: AdminMenuAction, no_text: str, no_action: AdminMenuAction) -> InlineKeyboardMarkup:
+async def build_yes_no_keyboard(yes_text: str, yes_action: AdminMenuAction, no_text: str, no_action: AdminMenuAction, **callback_kwargs) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text=no_text, callback_data=AdminCallback(level=2, action=no_action).pack())
-    builder.button(text=yes_text, callback_data=AdminCallback(level=2, action=yes_action).pack())
+    logger.warning(f"Got the kwargs {callback_kwargs}")
+    builder.button(text=no_text, callback_data=AdminCallback(level=2, action=no_action, **callback_kwargs).pack())
+    builder.button(text=yes_text, callback_data=AdminCallback(level=2, action=yes_action, **callback_kwargs).pack())
     builder.adjust(2)
     return builder.as_markup()
 
 
-async def build_skip_button(announcement_id: int, group_id: int, action: AdminMenuAction,
-                            button_name: str | None = None) -> InlineKeyboardMarkup:
+async def build_skip_button(announcement_id: int, action: AdminMenuAction,
+                            button_name: str | None = None, **callback_kwargs) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
 
     builder.button(text=button_name if button_name is not None else "Skip",
                    callback_data=AdminCallback(level=2, action=action,
                                                announcement_id=announcement_id,
-                                               group_id=group_id).pack())
+                                               **callback_kwargs).pack())
     return builder.as_markup()

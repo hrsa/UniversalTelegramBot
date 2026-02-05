@@ -97,7 +97,7 @@ async def force_backup(message: Message, state: FSMContext):
         await bot.send_message(message.chat.id, text)
 
 
-@router.callback_query(AdminPanel.choosing_group, AdminCallback.filter(F.action == AdminMenuAction.select_group))
+@router.callback_query(AdminCallback.filter(F.action == AdminMenuAction.select_group))
 async def process_group_selection(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
     group_id = callback_data.group_id
     if not group_id:

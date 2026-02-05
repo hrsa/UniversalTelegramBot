@@ -1,3 +1,5 @@
+from urllib.parse import urlparse
+
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -5,6 +7,7 @@ from loguru import logger
 
 from app.bot.core import bot
 from app.config import settings
+from app.db.models import message
 from app.db.session import async_session_maker
 from app.handlers.admin.admin_interactions import process_group_selection
 from app.helpers.admin_interactions import edit_message_safely, build_confirm_announcement_keyboard, \
@@ -18,6 +21,7 @@ from app.services.ai import AIService
 from app.services.group import GroupService
 from app.services.group_permission import GroupPermissionService
 from app.services.message import MessageService
+from app.services.message_button import ButtonService
 from app.services.translation import t_for
 
 router = Router()
@@ -25,6 +29,7 @@ group_permission_service = GroupPermissionService(async_session_maker)
 group_service = GroupService(async_session_maker)
 admin_service = AdminService(async_session_maker, group_service, group_permission_service)
 message_service = MessageService(async_session_maker)
+button_service = ButtonService(async_session_maker)
 
 
 @router.callback_query(AdminPanel.managing_features,
@@ -40,15 +45,17 @@ async def select_group_topic(callback: CallbackQuery, callback_data: AdminCallba
     else:
         return await set_announcement_text(callback=callback, callback_data=callback_data, state=state)
 
+
 @router.callback_query(AdminPanel.managing_features, AdminCallback.filter(F.action == AdminMenuAction.set_topic))
 async def set_announcement_text(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
-        await state.update_data(topic_id=callback_data.topic_id, group_id=callback_data.group_id, message_id=callback.message.message_id)
-        await state.set_state(Announcement.creating_announcement)
-        group = await group_service.get_group(callback_data.group_id)
-        text = await t_for(key="admin_interactions.create_announcement.enter_text",
+    await state.update_data(topic_id=callback_data.topic_id, group_id=callback_data.group_id,
+                            message_id=callback.message.message_id)
+    await state.set_state(Announcement.creating_announcement)
+    group = await group_service.get_group(callback_data.group_id)
+    text = await t_for(key="admin_interactions.create_announcement.enter_text",
                        user_id=callback.from_user.id,
                        group_name=group.title)
-        await edit_message_safely(message=callback.message, text=text)
+    await edit_message_safely(message=callback.message, text=text)
 
 
 @router.message(Announcement.creating_announcement, F.text)
@@ -91,11 +98,15 @@ async def select_announcement_text(callback: CallbackQuery, callback_data: Admin
         return
     group_id = await state.get_value("group_id")
     topic_id = await state.get_value("topic_id")
-    announcement = await message_service.create_message(group_id=group_id, topic_id=topic_id, text=final_announcement_text, is_published=False, is_pinned=False)
+    announcement = await message_service.create_message(group_id=group_id, topic_id=topic_id,
+                                                        text=final_announcement_text, is_published=False,
+                                                        is_pinned=False)
     await state.update_data(announcement_id=announcement.id)
     # await state.update_data(final_announcement_text=final_announcement_text, message_id=callback.message.message_id, user_id=callback.message.from_user.id)
     # await state.set_state(Announcement.adding_announcement_picture)
-    keyboard = await build_yes_no_keyboard(yes_text="Yes", no_text="No", yes_action=AdminMenuAction.add_announcement_picture, no_action=AdminMenuAction.skip_adding_picture)
+    keyboard = await build_yes_no_keyboard(yes_text="Yes", no_text="No",
+                                           yes_action=AdminMenuAction.add_announcement_picture,
+                                           no_action=AdminMenuAction.skip_adding_picture)
 
     await edit_message_safely(message=callback.message, text="Do you want to add a picture?", reply_markup=keyboard)
 
@@ -105,7 +116,7 @@ async def show_add_picture_dialogue(callback: CallbackQuery, state: FSMContext):
     await state.set_state(Announcement.adding_announcement_picture)
     await state.update_data(message_id=callback.message.message_id)
     text = "Please send me a picture that you want to add"
-    await edit_message_safely(message=callback.message,text=text)
+    await edit_message_safely(message=callback.message, text=text)
 
 
 @router.message(Announcement.adding_announcement_picture)
@@ -116,10 +127,10 @@ async def add_announcement_picture(message: Message, state: FSMContext):
     if message.photo:
         picture = message.photo[-1].file_id
     elif message.document:
-        message = await bot.send_message(message.chat.id, "Please send me a picture as a photo, not as a file.")
+        reply = await bot.send_message(message.chat.id, "Please send me a picture as a photo, not as a file.")
     else:
         logger.error(f"Invalid data in add_announcement_picture: {message}")
-        message = await bot.send_message(message.chat.id, "That is not an image! Please send me a picture.")
+        reply = await bot.send_message(message.chat.id, "That is not an image! Please send me a picture.")
     if picture:
         announcement_id = await state.get_value("announcement_id")
         announcement = await message_service.update_message(announcement_id=announcement_id, picture=picture)
@@ -128,9 +139,9 @@ async def add_announcement_picture(message: Message, state: FSMContext):
         keyboard = await build_yes_no_keyboard(yes_text="Send", no_text="cancel",
                                                yes_action=AdminMenuAction.send_announcement,
                                                no_action=AdminMenuAction.select_group)
-        message = await bot.send_photo(chat_id=message.chat.id, photo=announcement.picture,
+        reply = await bot.send_photo(chat_id=message.chat.id, photo=announcement.picture,
                                      caption=text + announcement.text + question, reply_markup=keyboard)
-    await state.update_data(message_id=message.message_id)
+    await state.update_data(message_id=reply.message_id)
 
 
 @router.callback_query(AdminCallback.filter(F.action == AdminMenuAction.skip_adding_picture))
@@ -140,71 +151,65 @@ async def show_send_announcement_dialogue(callback: CallbackQuery, state: FSMCon
     announcement = await message_service.get_message(announcement_id=announcement_id)
     text = "<pre>Here is your announcement:</pre>\n\n"
     question = "\n\n<pre>Do you want to send this announcement?</pre>"
-    keyboard = await build_yes_no_keyboard(yes_text="Send", no_text="Cancel", yes_action=AdminMenuAction.send_announcement, no_action=AdminMenuAction.select_group)
+    keyboard = await build_yes_no_keyboard(yes_text="Send", no_text="Cancel",
+                                           yes_action=AdminMenuAction.send_announcement,
+                                           no_action=AdminMenuAction.select_group)
     if announcement.picture:
-        reply = await bot.send_photo(chat_id=callback.message.chat.id, photo=announcement.picture, caption=text + announcement.text + question, reply_markup=keyboard)
+        reply = await bot.send_photo(chat_id=callback.message.chat.id, photo=announcement.picture,
+                                     caption=text + announcement.text + question, reply_markup=keyboard)
     else:
-        reply = await bot.send_message(chat_id=callback.message.chat.id, text=text + announcement.text + question, reply_markup=keyboard)
+        reply = await bot.send_message(chat_id=callback.message.chat.id, text=text + announcement.text + question,
+                                       reply_markup=keyboard)
     await state.update_data(message_id=reply.message_id)
+
 
 @router.callback_query(AdminCallback.filter(F.action == AdminMenuAction.send_announcement))
 async def send_announcement(callback: CallbackQuery, state: FSMContext):
     announcement_id = await state.get_value("announcement_id")
     announcement = await message_service.get_message(announcement_id=announcement_id)
-    logger.warning(f"Got ID {announcement_id} and announcement {announcement}")
-    can_pin_announcements = await group_permission_service.check_permission(announcement.group_id, "can_pin_messages")
+    # can_pin_announcements = await group_permission_service.check_permission(announcement.group_id, "can_pin_messages")
 
     if announcement.picture:
-        result = await bot.send_photo(chat_id=announcement.group_id, message_thread_id=announcement.topic_id, photo=announcement.picture, caption=announcement.text)
-        logger.warning(result)
+        result = await bot.send_photo(chat_id=announcement.group_id, message_thread_id=announcement.topic_id,
+                                      photo=announcement.picture, caption=announcement.text)
     else:
-        result = await bot.send_message(chat_id=announcement.group_id, message_thread_id=announcement.topic_id, text=announcement.text)
+        result = await bot.send_message(chat_id=announcement.group_id, message_thread_id=announcement.topic_id,
+                                        text=announcement.text)
     if not result:
         failed_to_send_text = await t_for(key="admin_interactions.create_announcement.failed_to_send_announcement",
                                           user_id=callback.from_user.id)
         await callback.answer(failed_to_send_text)
         return
 
-    announcement = await message_service.update_message(announcement_id=announcement.id, message_id=result.message_id, is_published=True)
-
-    success_text = await t_for(key="admin_interactions.create_announcement.announcement_sent",
-                               user_id=callback.from_user.id)
-    pin_dialogue_text = await t_for(key="admin_interactions.create_announcement.pin.pin_dialogue",
-                                    user_id=callback.from_user.id)
+    await message_service.update_message(announcement_id=announcement.id, message_id=result.message_id,
+                                         is_published=True)
     await delete_messages_safely(callback.message.chat.id, [callback.message.message_id])
-    if can_pin_announcements:
-        await state.set_state(Announcement.confirming_pin)
-        keyboard = await build_confirm_pin_keyboard(group_id=announcement.group_id,
-                                                    announcement_id=announcement.message_id)
-        await bot.send_message(chat_id=callback.message.chat.id,
-                                  text=f"P{success_text}\n{pin_dialogue_text}",
-                                  reply_markup=keyboard)
-    else:
-        group = await group_service.get_group(announcement.group_id)
-        selected_group_dialogue_text = await t_for(key="admin_interactions.group_management.group_selected",
-                                                   user_id=callback.from_user.id,
-                                                   title=group.title)
-        features = await group_service.get_features(announcement.group_id)
-        keyboard = await build_main_features_keyboard(announcement.group_id, features)
-        text = f"{success_text}\n\n{selected_group_dialogue_text}"
 
-        await bot.send_message(chat_id=callback.message.chat.id,
-                                  text=text,
-                                  reply_markup=keyboard)
-        await state.set_state(AdminPanel.managing_features)
+    question = "Announcement published!\nDo you want to add buttons to it?"
+    keyboard = await build_yes_no_keyboard(yes_text="Add buttons", no_text="Cancel",
+                                           yes_action=AdminMenuAction.add_announcement_button,
+                                           no_action=AdminMenuAction.select_group)
+
+    reply = await bot.send_message(chat_id=callback.message.chat.id, text=question, reply_markup=keyboard)
+    await state.update_data(message_id=reply.message_id)
 
 
-@router.callback_query(AdminCallback.filter(F.action == AdminMenuAction.set_announcement_button_name))
-async def show_setting_button_name_dialogue(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
+@router.callback_query(AdminCallback.filter(F.action == AdminMenuAction.add_announcement_button))
+async def add_button_name_dialogue(callback: CallbackQuery, state: FSMContext):
     await state.set_state(Announcement.setting_button_name)
-    text = await t_for(key="admin_interactions.create_announcement.payment.button_name_dialogue",
-                       user_id=callback.from_user.id)
-    await edit_message_safely(callback.message, text=text)
+    await state.update_data(button_name="")
+    announcement_id = await state.get_value("announcement_id")
+    group_id = await state.get_value("group_id")
+    text = "Please write the name of the button you want to add."
+    keyboard = await build_skip_button(announcement_id=announcement_id, group_id=group_id,
+                                       action=AdminMenuAction.select_group, button_name="Cancel")
+    await edit_message_safely(callback.message, text=text, reply_markup=keyboard)
 
 
 @router.message(Announcement.setting_button_name, F.text)
-async def set_announcement_button_name_and_show_callback_title_dialogue(message: Message, state: FSMContext):
+async def set_announcement_button_name(message: Message, state: FSMContext):
     message_id = await state.get_value("message_id")
+    group_id = await state.get_value("group_id")
     await delete_messages_safely(message.chat.id, [message_id, message.message_id])
 
     if len(message.text) > 64:
@@ -212,67 +217,76 @@ async def set_announcement_button_name_and_show_callback_title_dialogue(message:
                                              user_id=message.from_user.id)
         reply = await bot.send_message(chat_id=message.chat.id, text=title_is_too_long_text)
     else:
-        await state.set_state(Announcement.setting_callback_title)
-        success_text = await t_for(key="admin_interactions.create_announcement.payment.button_name_added",
-                                   user_id=message.from_user.id,
-                                   name=message.text)
-        event_name_dialogue_text = await t_for(key="admin_interactions.create_announcement.payment.event_name_dialogue",
-                                               user_id=message.from_user.id)
-        reply = await bot.send_message(chat_id=message.chat.id,
-                                       text=f"{success_text}\n\n{event_name_dialogue_text}", )
-    await state.update_data(message_id=reply.message_id, button_name=message.text)
+        await state.update_data(button_name=message.text)
+        text = f"Your button will have the following name:\n\n<blockquote>{message.text}</blockquote>\n\nIs that correct?"
+        keyboard = await build_yes_no_keyboard(yes_text="Yes", no_text="No",
+                                               yes_action=AdminMenuAction.set_announcement_button_name,
+                                               no_action=AdminMenuAction.add_announcement_button,
+                                               group_id=group_id)
+        reply = await bot.send_message(chat_id=message.chat.id, text=text, reply_markup=keyboard)
+    await state.update_data(message_id=reply.message_id)
 
 
-# @router.message(Announcement.setting_callback_title, F.text)
-# async def set_callback_title(message: Message, state: FSMContext):
-#     group_id = await state.get_value("group_id")
-#     announcement_id = await state.get_value("announcement_id")
-#     message_id = await state.get_value("message_id")
-#     button_name = await state.get_value("button_name")
-#     await delete_messages_safely(message.chat.id, [message_id, message.message_id])
-#     if len(message.text) > 64:
-#         title_is_too_long_text = await t_for(key="admin_interactions.create_announcement.payment.title_too_long",
-#                                              user_id=message.from_user.id)
-#         reply = await bot.send_message(chat_id=message.chat.id, text=title_is_too_long_text)
-#     else:
-#         try:
-#             await message_service.add_button_to_announcement(group_id=group_id, message_id=announcement_id,
-#                                                              button_text=button_name, event_name=message.text, )
-#             await state.set_state(Announcement.setting_reward_type)
-#             keyboard = await build_reward_type_keyboard(announcement_id=announcement_id, group_id=group_id)
-#             reward_dialogue_text = await t_for(key="admin_interactions.create_announcement.payment.reward_dialogue",
-#                                                user_id=message.from_user.id)
-#             reply = await bot.send_message(chat_id=message.chat.id, text=reward_dialogue_text,
-#                                            reply_markup=keyboard)
-#         except ValueError as e:
-#             reply = await bot.send_message(chat_id=message.chat.id, text=e.args[0])
-#     await state.update_data(message_id=reply.message_id)
+@router.callback_query(AdminCallback.filter(F.action == AdminMenuAction.set_announcement_button_name))
+async def add_button_link_dialogue(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(Announcement.setting_button_link)
+    await state.update_data(button_link="")
+    announcement_id = await state.get_value("announcement_id")
+    group_id = await state.get_value("group_id")
+    text = "Please write the link that the button will lead to."
+    keyboard = await build_skip_button(announcement_id=announcement_id, group_id=group_id,
+                                       action=AdminMenuAction.select_group, button_name="Cancel")
+    await edit_message_safely(callback.message, text=text, reply_markup=keyboard)
 
 
-# async def show_pin_dialogue(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
-#     can_pin_announcements = await group_permission_service.check_permission(callback_data.group_id, "can_pin_messages")
-#     if not can_pin_announcements:
-#         keyboard = await build_confirm_pin_keyboard(group_id=callback_data.group_id,
-#                                                     announcement_id=callback_data.announcement_id)
-#         pin_dialogue_text = await t_for(key="admin_interactions.create_announcement.pin.pin_dialogue",
-#                                         user_id=callback.from_user.id)
-#         await edit_message_safely(message=callback.message, text=pin_dialogue_text,
-#                                   reply_markup=keyboard)
-#         await state.set_state(Announcement.confirming_pin)
-#     else:
-#         group = await group_service.get_or_create_group(callback_data.group_id)
-#         features = await group_service.get_features(callback_data.group_id)
-#         keyboard = await build_main_features_keyboard(callback_data.group_id, features,
-#                                                       callback.from_user.id == settings.ADMIN_TELEGRAM_ID)
-#         success_text = await t_for(key="admin_interactions.create_announcement.announcement_sent",
-#                                    user_id=callback.from_user.id)
-#         group_features_dialogue = await t_for(key="admin_interactions.group_management.group_selected",
-#                                               user_id=callback.from_user.id,
-#                                               title=group.title)
-#         await edit_message_safely(message=callback.message,
-#                                   text=f"{success_text}\n\n{group_features_dialogue}",
-#                                   reply_markup=keyboard)
-#         await state.set_state(AdminPanel.managing_features)
+@router.message(Announcement.setting_button_link, F.text)
+async def set_announcement_button_link(message: Message, state: FSMContext):
+    message_id = await state.get_value("message_id")
+    group_id = await state.get_value("group_id")
+    await delete_messages_safely(message.chat.id, [message_id, message.message_id])
+
+    parsed = urlparse(message.text.strip())
+    is_valid_url = parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+    if not is_valid_url:
+        reply = await bot.send_message(
+            chat_id=message.chat.id,
+            text="That doesn't look like a valid URL. Please send a full link starting with http:// or https://"
+        )
+        await state.update_data(message_id=reply.message_id)
+    else:
+        await state.update_data(button_link=message.text.strip())
+        button_name = await state.get_value("button_name")
+        text = f"Your button '{button_name}' will lead to:\n<blockquote>{message.text.strip()}</blockquote>\n\nIs that correct?"
+        keyboard = await build_yes_no_keyboard(yes_text="Yes", no_text="No",
+                                               yes_action=AdminMenuAction.set_announcement_button_link,
+                                               no_action=AdminMenuAction.set_announcement_button_name,
+                                               group_id=group_id)
+        reply = await bot.send_message(chat_id=message.chat.id, text=text, reply_markup=keyboard)
+    await state.update_data(message_id=reply.message_id)
+
+
+@router.callback_query(AdminCallback.filter(F.action == AdminMenuAction.set_announcement_button_link))
+async def create_and_publish_announcement_button(callback: CallbackQuery, state: FSMContext):
+    button_name = await state.get_value("button_name")
+    button_link = await state.get_value("button_link")
+    group_id = await state.get_value("group_id")
+    announcement_id = await state.get_value("announcement_id")
+    try:
+        announcement = await message_service.get_message(announcement_id=announcement_id)
+        await button_service.create_button(message_id=announcement.id, button_text=button_name, button_link=button_link)
+        await message_service.add_buttons_to_announcement(message_id=announcement.message_id,
+                                                          group_id=announcement.group_id)
+    except Exception as e:
+        logger.error(e)
+        await callback.answer("Failed to create button. Please try again later.")
+        await edit_message_safely(callback.message, text=str(e))
+        return
+
+    text = f"Button '{button_name}' created and published successfully.\nWould you like to add another button?"
+    keyboard = await build_yes_no_keyboard(yes_text="Add more buttons", no_text="Done",
+                                           yes_action=AdminMenuAction.add_announcement_button,
+                                           no_action=AdminMenuAction.select_group, group_id=group_id)
+    await edit_message_safely(callback.message, text=text, reply_markup=keyboard)
 
 
 @router.callback_query(Announcement.confirming_pin,

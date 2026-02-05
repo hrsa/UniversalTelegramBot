@@ -59,7 +59,7 @@ async def delete_button(session: AsyncSession, button_id: int):
 async def get_message_buttons(session: AsyncSession, message_id: int) -> Sequence[Button]:
     stmt = (select(Button)
             .where(Button.message_id == message_id)
-            .order_by(Button.id.desc()))
+            .order_by(Button.id.asc()))
 
     result = await session.execute(stmt)
     return result.scalars().all()

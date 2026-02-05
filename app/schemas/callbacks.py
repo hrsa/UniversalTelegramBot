@@ -17,7 +17,9 @@ class AdminMenuAction(str, Enum):
     send_announcement = 'sa'
     confirm_edit_announcement = 'cea'
     skip_to_pin_announcement = 'stp'
+    add_announcement_button = "aad"
     set_announcement_button_name = 'sbn'
+    set_announcement_button_link = 'sbl'
     add_announcement_picture = 'aap'
     modify_callback_button_title = 'mcbt'
     modify_button_name = 'mbn'

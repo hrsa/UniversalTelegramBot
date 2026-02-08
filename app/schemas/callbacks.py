@@ -17,10 +17,19 @@ class AdminMenuAction(str, Enum):
     send_announcement = 'sa'
     confirm_edit_announcement = 'cea'
     skip_to_pin_announcement = 'stp'
-    add_announcement_button = "aad"
+    add_announcement_button = 'aab'
+    add_announcement_button_name = "aabn"
+    add_announcement_button_link = "aabl"
+    confirm_and_add_button = "caab"
     set_announcement_button_name = 'sbn'
     set_announcement_button_link = 'sbl'
     add_announcement_picture = 'aap'
+    modify_announcement_buttons = "mab"
+    edit_announcement_button = "eab"
+    edit_button_text = "ebt"
+    edit_button_link = "ebl"
+    delete_announcement_button = "dab"
+    confirm_delete_announcement_button = "cdab"
     modify_callback_button_title = 'mcbt'
     modify_button_name = 'mbn'
     confirm_announcement = 'ca'
@@ -33,12 +42,14 @@ class AdminMenuAction(str, Enum):
     back = 'b'
     quit = 'q'
 
+
 class GroupFeature(str, Enum):
     greeting_watch = 'gw'
     kick_inactive_members = 'kim'
     max_warning_count = 'mwc'
     report_new_members = 'rnm'
     report_leaving_members = 'rlm'
+
 
 class AnnouncementAction(str, Enum):
     join = 'j'
@@ -58,8 +69,9 @@ class AdminCallback(CallbackData, prefix='ad'):
     announcement_id: int | None = None
     announcement_offset: int | None = None
     topic_id: int | None = None
+    button_id: int | None = None
     group_id: int | None = None
-    feature_name: GroupFeature| None = None
+    feature_name: GroupFeature | None = None
 
 
 class AnnouncementCallback(CallbackData, prefix='an'):

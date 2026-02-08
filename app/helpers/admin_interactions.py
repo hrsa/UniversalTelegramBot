@@ -1,9 +1,10 @@
-from typing import Sequence, get_args
+from typing import Sequence
 
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import InlineKeyboardMarkup, MaybeInaccessibleMessageUnion
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from loguru import logger
+from sqlalchemy.orm import Mapped
 
 from app.bot.core import bot
 from app.db.models.group import Group
@@ -31,7 +32,7 @@ async def edit_message_safely(message: MaybeInaccessibleMessageUnion, text: str,
         logger.error(f"Failed to edit message {message.message_id}: {e}")
 
 
-async def delete_messages_safely(chat_id: int, message_ids: Sequence[int]):
+async def delete_messages_safely(chat_id: int, message_ids: Sequence[int] | Sequence[Mapped[int]]):
     for message_id in message_ids:
         try:
             await bot.delete_message(chat_id=chat_id, message_id=message_id)
@@ -53,7 +54,8 @@ async def build_group_selection_keyboard(groups: Sequence[Group]) -> InlineKeybo
     return builder.as_markup()
 
 
-async def build_main_features_keyboard(group_id: int, features: GroupFeatures | ChannelFeatures) -> InlineKeyboardMarkup:
+async def build_main_features_keyboard(group_id: int,
+                                       features: GroupFeatures | ChannelFeatures) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="Make a new announcement ➡️",
                    callback_data=AdminCallback(level=1, action=AdminMenuAction.make_announcement,
@@ -222,28 +224,25 @@ async def build_announcement_mgmt_message(announcement: Message | None, group_id
     builder.button(text="Improve with AI 🤖",
                    callback_data=AdminCallback(level=2, action=AdminMenuAction.rewrite_announcement,
                                                announcement_offset=offset,
-                                               announcement_id=announcement.message_id,
-                                               group_id=group_id).pack())
-
-    # TODO: modify button change to include a link
-    builder.button(text="Modify button name",
-                   callback_data=AdminCallback(level=2, action=AdminMenuAction.modify_callback_button_title,
-                                               announcement_id=announcement.message_id, group_id=group_id).pack())
+                                               announcement_id=announcement.id).pack())
 
     if can_pin_announcements:
         builder.button(text="Un-pin 📌" if announcement.is_pinned else "Pin 📌",
                        callback_data=AdminCallback(level=2, action=AdminMenuAction.confirm_pin,
                                                    announcement_offset=offset,
-                                                   announcement_id=announcement.message_id,
+                                                   announcement_id=announcement.id,
                                                    group_id=group_id
                                                    ).pack())
 
+    builder.button(text="Manage buttons",
+                   callback_data=AdminCallback(level=2, action=AdminMenuAction.modify_announcement_buttons,
+                                               announcement_id=announcement.id, group_id=group_id).pack())
 
     if announcement.can_be_deleted:
         builder.button(text="Delete 🗑️",
                        callback_data=AdminCallback(level=2, action=AdminMenuAction.delete_announcement,
                                                    announcement_offset=offset,
-                                                   announcement_id=announcement.message_id,
+                                                   announcement_id=announcement.id,
                                                    group_id=group_id
                                                    ).pack())
 
@@ -255,6 +254,37 @@ async def build_announcement_mgmt_message(announcement: Message | None, group_id
     else:
         builder.adjust(1)
     return text, builder.as_markup()
+
+
+async def build_modify_buttons_keyboard(announcement: Message) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for button in announcement.buttons:
+        builder.button(text=button.text,
+                       callback_data=AdminCallback(level=2, action=AdminMenuAction.edit_announcement_button,
+                                                   button_id=button.id))
+    builder.button(text="Add button",
+                   callback_data=AdminCallback(level=2, action=AdminMenuAction.add_announcement_button_name,
+                                               group_id=announcement.group_id,
+                                               announcement_id=announcement.id).pack())
+    builder.button(text="⬅️ Back",
+                   callback_data=AdminCallback(level=2, action=AdminMenuAction.back,
+                                               group_id=announcement.group_id).pack())
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+async def build_edit_button_keyboard(button_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Edit text", callback_data=AdminCallback(level=2, action=AdminMenuAction.edit_button_text,
+                                                                 button_id=button_id).pack())
+    builder.button(text="Edit link", callback_data=AdminCallback(level=2, action=AdminMenuAction.edit_button_link,
+                                                                 button_id=button_id).pack())
+    builder.button(text="Delete button",
+                   callback_data=AdminCallback(level=2, action=AdminMenuAction.delete_announcement_button,
+                                               button_id=button_id).pack())
+    builder.button(text="Cancel", callback_data=AdminCallback(level=2, action=AdminMenuAction.back).pack())
+    builder.adjust(1)
+    return builder.as_markup()
 
 
 async def build_announcement_delete_confirmation(announcement: Message, offset: int) -> tuple[
@@ -298,7 +328,8 @@ async def build_topics_selection_keyboard(topics: Sequence[GroupTopic], group_id
     return builder.as_markup()
 
 
-async def build_yes_no_keyboard(yes_text: str, yes_action: AdminMenuAction, no_text: str, no_action: AdminMenuAction, **callback_kwargs) -> InlineKeyboardMarkup:
+async def build_yes_no_keyboard(yes_text: str, yes_action: AdminMenuAction, no_text: str, no_action: AdminMenuAction,
+                                **callback_kwargs) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     logger.warning(f"Got the kwargs {callback_kwargs}")
     builder.button(text=no_text, callback_data=AdminCallback(level=2, action=no_action, **callback_kwargs).pack())

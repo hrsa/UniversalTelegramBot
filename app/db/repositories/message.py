@@ -4,13 +4,14 @@ from typing import Sequence
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
 from app.db.models.message import Message
 
 
 async def get_message(session: AsyncSession, announcement_id: int | None = None, group_id: int | None = None,
                       message_id: int | None = None) -> Message | None:
-    stmt = select(Message)
+    stmt = select(Message).options(selectinload(Message.buttons))
     if announcement_id:
         stmt = stmt.where(Message.id == announcement_id)
     elif group_id and message_id:
@@ -63,6 +64,7 @@ async def delete_message(session: AsyncSession, announcement_id: int | None = No
 async def get_messages_for_group(session: AsyncSession, group_id: int, offset: int = 0, limit: int = 0) -> tuple[
     Sequence[Message], int]:
     stmt = (select(Message)
+            .options(selectinload(Message.buttons))
             .where(Message.group_id == group_id)
             .order_by(Message.created_at.desc()))
 

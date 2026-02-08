@@ -4,12 +4,15 @@ from typing import Sequence
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
 from app.db.models.message_button import Button
 
 
 async def get_button(session: AsyncSession, button_id: int) -> Button | None:
-    stmt = select(Button).where(Button.id == button_id)
+    stmt = (select(Button)
+            .options(selectinload(Button.message))
+            .where(Button.id == button_id))
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
 

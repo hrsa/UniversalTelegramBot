@@ -45,8 +45,9 @@ class MessageService:
             raise ValueError(f"Message with id {message_id} not found in group {group_id}")
         return message.is_pinned
 
-    async def delete_message(self, announcement_id: int | None = None, group_id: int | None = None,
-                             message_id: int | None = None):
+    async def delete_message(self, announcement_id: int | Mapped[int] | None = None,
+                             group_id: int | Mapped[int] | None = None,
+                             message_id: int | Mapped[int] | None = None):
         if announcement_id is None and group_id is None and message_id is None:
             raise ValueError("At least one of announcement_id, group_id, or message_id must be provided")
         async with self.session() as session:

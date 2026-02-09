@@ -33,6 +33,4 @@ async def update_group_members_and_group_topics(message: Message):
                                                         is_bot=message.from_user.is_bot)
 
     if message.is_topic_message and message.reply_to_message and message.reply_to_message.forum_topic_created:
-        logger.info("Dumping is_topic_message")
-        logger.info(message)
         await group_service.get_or_create_topic(group_id=message.chat.id, topic_id=message.message_thread_id, topic_name=message.reply_to_message.forum_topic_created.name)

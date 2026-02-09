@@ -10,10 +10,13 @@ class AdminMenuAction(str, Enum):
     set_value = 'sv'
     make_announcement = 'ma'
     manage_announcements = 'mga'
+    edit_announcement_text = "eat"
+    confirm_edit_announcement_text = "ceat"
     set_topic = 'st'
     set_announcement_group = 'sgg'
-    rewrite_announcement = 'ra'
+    rewrite_announcement_with_ai = 'rai'
     skip_adding_picture = 'sap'
+    edit_announcement_picture = 'eap'
     send_announcement = 'sa'
     confirm_edit_announcement = 'cea'
     skip_to_pin_announcement = 'stp'

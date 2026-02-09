@@ -23,6 +23,8 @@ class Announcement(StatesGroup):
     setting_button_link = State()
     adding_button_name = State()
     adding_button_link = State()
+    editing_announcement_text = State()
+    editing_announcement_picture = State()
     editing_button_name = State()
     editing_button_link = State()
     setting_announcement_group_topic = State()

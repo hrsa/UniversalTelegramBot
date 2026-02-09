@@ -32,11 +32,12 @@ button_service = ButtonService(async_session_maker)
 @router.callback_query(AdminCallback.filter(F.action == AdminMenuAction.manage_announcements))
 async def manage_announcements(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
     await state.set_state(Announcement.managing_announcements)
+    group_id = callback_data.group_id if callback_data.group_id is not None else await state.get_value("group_id")
     offset = callback_data.announcement_offset if callback_data.announcement_offset is not None else 0
     limit = 1
-    can_pin_announcements = await group_permission_service.check_permission(callback_data.group_id, "can_pin_messages")
+    can_pin_announcements = await group_permission_service.check_permission(group_id, "can_pin_messages")
 
-    announcements, count = await group_service.get_group_announcements(group_id=callback_data.group_id, offset=offset,
+    announcements, count = await group_service.get_group_announcements(group_id=group_id, offset=offset,
                                                                        limit=limit)
     await state.update_data(group_id=callback_data.group_id,
                             announcement_id=announcements[0].id if announcements else None)
@@ -45,6 +46,43 @@ async def manage_announcements(callback: CallbackQuery, callback_data: AdminCall
                                                            can_pin_announcements=can_pin_announcements)
     await edit_message_safely(message=callback.message, text=text, reply_markup=keyboard)
 
+
+@router.callback_query(Announcement.managing_announcements,
+                       AdminCallback.filter(F.action == AdminMenuAction.edit_announcement_picture))
+async def show_edit_picture_dialogue(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
+    await state.set_state(Announcement.editing_announcement_picture)
+    await state.update_data(message_id=callback.message.message_id, announcement_id=callback_data.announcement_id)
+    keyboard = await build_skip_button(announcement_id=callback_data.announcement_id, group_id=callback_data.group_id,
+                                       action=AdminMenuAction.back, button_name="Cancel")
+    await edit_message_safely(message=callback.message, text="Please send the new picture", reply_markup=keyboard)
+
+@router.message(Announcement.editing_announcement_picture)
+async def edit_announcement_picture(message: Message, state: FSMContext):
+    message_id = await state.get_value("message_id")
+    announcement_id = await state.get_value("announcement_id")
+    announcement = await message_service.get_message(announcement_id=announcement_id)
+    await delete_messages_safely(message.chat.id, [message.message_id, message_id])
+    cancel_keyboard = await build_skip_button(announcement_id=announcement.id, group_id=announcement.group_id,
+                                               action=AdminMenuAction.back, button_name="Cancel")
+    try:
+        if message.photo:
+            picture = message.photo[-1].file_id
+            await message_service.edit_announcement_picture(picture=picture, announcement_id=announcement.id)
+            await state.set_state(Announcement.managing_announcements)
+            text = "Picture updated successfully!"
+            keyboard = await build_skip_button(announcement_id=announcement.id, group_id=announcement.group_id,
+                                               action=AdminMenuAction.back, button_name="Done")
+            reply = await bot.send_message(chat_id=message.chat.id, text=text, reply_markup=keyboard)
+        elif message.document:
+            reply = await bot.send_message(chat_id=message.chat.id, text="Please send me a picture as a photo, not as a file.", reply_markup=cancel_keyboard)
+        else:
+            logger.error(f"Invalid data in add_announcement_picture: {message}")
+
+            reply = await bot.send_message(chat_id=message.chat.id, text="That is not an image! Please send me a picture.", reply_markup=cancel_keyboard)
+    except Exception as e:
+        logger.error(e)
+        reply = await bot.send_message(chat_id=message.chat.id, text=f"An error occured: {e}", reply_markup=cancel_keyboard)
+    await state.update_data(message_id=reply.message_id)
 
 @router.callback_query(Announcement.managing_announcements,
                        AdminCallback.filter(F.action == AdminMenuAction.modify_announcement_buttons))
@@ -64,6 +102,7 @@ async def show_add_button_name_dialogue(callback: CallbackQuery, callback_data: 
                                        action=AdminMenuAction.back, button_name="Cancel")
     text = "Please write the name of the button you want to add."
     await edit_message_safely(message=callback.message, text=text, reply_markup=keyboard)
+
 
 @router.message(Announcement.adding_button_name, F.text)
 async def add_button_name(message: Message, state: FSMContext):
@@ -99,6 +138,7 @@ async def show_add_button_link_dialogue(callback: CallbackQuery, callback_data: 
                                        action=AdminMenuAction.back, button_name="Cancel")
     await edit_message_safely(callback.message, text=text, reply_markup=keyboard)
 
+
 @router.message(Announcement.adding_button_link, F.text)
 async def add_button_link(message: Message, state: FSMContext):
     message_id = await state.get_value("message_id")
@@ -125,6 +165,7 @@ async def add_button_link(message: Message, state: FSMContext):
                                                group_id=group_id, announcement_id=announcement_id)
         reply = await bot.send_message(chat_id=message.chat.id, text=text, reply_markup=keyboard)
     await state.update_data(message_id=reply.message_id)
+
 
 @router.callback_query(Announcement.managing_announcements,
                        AdminCallback.filter(F.action == AdminMenuAction.confirm_and_add_button))
@@ -275,15 +316,72 @@ async def confirm_announcement_deletion(callback: CallbackQuery, callback_data: 
 
 
 @router.callback_query(Announcement.managing_announcements,
-                       AdminCallback.filter(F.action == AdminMenuAction.rewrite_announcement))
+                       AdminCallback.filter(F.action == AdminMenuAction.edit_announcement_text))
+async def show_edit_announcement_text_dialogue(callback: CallbackQuery, callback_data: AdminCallback,
+                                               state: FSMContext):
+    await state.set_state(Announcement.editing_announcement_text)
+    announcement = await message_service.get_message(announcement_id=callback_data.announcement_id)
+    text = (f"Current announcement text: <blockquote>{announcement.text}</blockquote>\n"
+            f"Please write a new announcement text or cancel.")
+    keyboard = await build_skip_button(announcement_id=announcement.id, group_id=announcement.group_id,
+                                       action=AdminMenuAction.back, button_name="Cancel")
+    await state.update_data(message_id=callback.message.message_id, announcement_id=announcement.id)
+    await edit_message_safely(message=callback.message, text=text, reply_markup=keyboard)
+
+
+@router.message(Announcement.editing_announcement_text, F.text)
+async def show_edit_announcement_text_confirmation(message: Message, state: FSMContext):
+    message_id = await state.get_value("message_id")
+    announcement_id = await state.get_value("announcement_id")
+    announcement = await message_service.get_message(announcement_id=announcement_id)
+    await delete_messages_safely(message.chat.id, [message_id, message.message_id])
+
+    if message.text == announcement.text:
+        reply = await bot.send_message(message.chat.id, "No changes detected. Announcement text remains unchanged.")
+        await state.update_data(message_id=reply.message_id)
+    else:
+        await state.update_data(announcement_text=message.text)
+        text = (f"Old announcement text: <blockquote>{announcement.text}</blockquote>\n"
+                f"New announcement text: <blockquote>{message.text}</blockquote>\n"
+                f"Do you want to publish your changes?")
+        keyboard = await build_yes_no_keyboard(yes_text="Modify text", no_text="Cancel",
+                                               yes_action=AdminMenuAction.confirm_edit_announcement_text,
+                                               no_action=AdminMenuAction.manage_announcements,
+                                               announcement_id=announcement.id,
+                                               group_id=announcement.group_id)
+        reply = await bot.send_message(message.chat.id, text=text, reply_markup=keyboard)
+    await state.update_data(message_id=reply.message_id)
+
+@router.callback_query(Announcement.editing_announcement_text,
+                       AdminCallback.filter(F.action == AdminMenuAction.confirm_edit_announcement_text))
+async def update_announcement_text(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
+    await state.set_state(Announcement.managing_announcements)
+    new_text = await state.get_value("announcement_text")
+    announcement = await message_service.get_message(announcement_id=callback_data.announcement_id)
+    keyboard = await build_skip_button(announcement_id=announcement.id, group_id=announcement.group_id,
+                                       action=AdminMenuAction.back, button_name="Done")
+    try:
+        await message_service.edit_announcement_text(announcement_id=callback_data.announcement_id, text=new_text)
+        await callback.answer("Announcement updated!")
+        await edit_message_safely(message=callback.message, text="Announcement updated!")
+        result = "Text successfully updated."
+    except Exception as e:
+        logger.error(e)
+        result = f"Failed to update text: {e}"
+    await edit_message_safely(message=callback.message, text=result, reply_markup=keyboard)
+
+
+@router.callback_query(Announcement.managing_announcements,
+                       AdminCallback.filter(F.action == AdminMenuAction.rewrite_announcement_with_ai))
 async def rewrite_announcement(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
     await callback.answer("🤖 Thinking... 🤖")
+    group_id = callback_data.group_id if callback_data.group_id is not None else await state.get_value("group_id")
     announcement = await message_service.get_message(announcement_id=callback_data.announcement_id)
     ai_service = AIService()
     rewritten_text = await ai_service.rewrite_announcement(original_text=announcement.text)
     await state.update_data(ai_announcement_text=rewritten_text)
     final_text = f"Original announcement: <blockquote>{announcement.text}</blockquote>\n\nAI version: <blockquote>{rewritten_text}</blockquote>"
-    keyboard = await build_modify_ai_vs_human_announcement_keyboard(group_id=callback_data.group_id,
+    keyboard = await build_modify_ai_vs_human_announcement_keyboard(group_id=group_id,
                                                                     announcement_id=callback_data.announcement_id,
                                                                     offset=callback_data.announcement_offset)
     await edit_message_safely(message=callback.message, text=final_text, reply_markup=keyboard)

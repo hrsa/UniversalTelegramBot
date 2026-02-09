@@ -140,7 +140,7 @@ async def build_greeting_watch_text(group_id: int, username: str, group_service:
 async def build_confirm_announcement_keyboard(group_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="Improve with AI 🤖",
-                   callback_data=AdminCallback(level=2, action=AdminMenuAction.rewrite_announcement,
+                   callback_data=AdminCallback(level=2, action=AdminMenuAction.rewrite_announcement_with_ai,
                                                group_id=group_id).pack())
     builder.button(text="⬅️ Back",
                    callback_data=AdminCallback(level=2, action=AdminMenuAction.back,
@@ -222,9 +222,19 @@ async def build_announcement_mgmt_message(announcement: Message | None, group_id
                                                               group_id=group_id
                                                               ).pack())
     builder.button(text="Improve with AI 🤖",
-                   callback_data=AdminCallback(level=2, action=AdminMenuAction.rewrite_announcement,
+                   callback_data=AdminCallback(level=2, action=AdminMenuAction.rewrite_announcement_with_ai,
                                                announcement_offset=offset,
                                                announcement_id=announcement.id).pack())
+
+    builder.button(text="Modify text",
+                   callback_data=AdminCallback(level=2, action=AdminMenuAction.edit_announcement_text,
+                                               announcement_id=announcement.id,
+                                               group_id=announcement.group_id).pack())
+
+    builder.button(text="Modify picture" if announcement.picture else "Add picture",
+                   callback_data=AdminCallback(level=2, action=AdminMenuAction.edit_announcement_picture,
+                                               announcement_id=announcement.id,
+                                               group_id=announcement.group_id).pack())
 
     if can_pin_announcements:
         builder.button(text="Un-pin 📌" if announcement.is_pinned else "Pin 📌",
@@ -338,7 +348,7 @@ async def build_yes_no_keyboard(yes_text: str, yes_action: AdminMenuAction, no_t
     return builder.as_markup()
 
 
-async def build_skip_button(announcement_id: int, action: AdminMenuAction,
+async def build_skip_button(announcement_id: int | Mapped[int], action: AdminMenuAction,
                             button_name: str | None = None, **callback_kwargs) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
 

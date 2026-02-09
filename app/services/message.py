@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Sequence, cast
 
-from aiogram.types import message_id
+from aiogram.types import message_id, InputMediaPhoto
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from loguru import logger
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -64,6 +64,35 @@ class MessageService:
                                                      message_id=message_id,
                                                      topic_id=topic_id, is_published=is_published, text=text,
                                                      picture=picture, is_pinned=is_pinned)
+
+    async def edit_announcement_text(self, text: str, announcement_id: int | Mapped[int] | None = None):
+        announcement = await self.get_message(announcement_id=announcement_id)
+        if announcement is None:
+            raise ValueError(f"Message with id {announcement_id} not found in announcement")
+        if announcement.text == text:
+            return
+        try:
+            if announcement.picture:
+                await bot.edit_message_caption(chat_id=announcement.group_id, message_id=announcement.message_id, caption=text)
+            else:
+                await bot.edit_message_text(chat_id=announcement.group_id, message_id=announcement.message_id, text=text)
+            await self.update_message(announcement_id=announcement_id, text=text)
+        except Exception as e:
+            logger.error(e)
+            raise e
+
+    async def edit_announcement_picture(self, picture: str, announcement_id: int | Mapped[int] | None = None):
+        announcement = await self.get_message(announcement_id=announcement_id)
+        if announcement is None:
+            raise ValueError(f"Message with id {announcement_id} not found in announcement")
+        try:
+            media = InputMediaPhoto(media=picture, caption=announcement.text)
+            await bot.edit_message_media(chat_id=announcement.group_id, message_id=announcement.message_id, media=media)
+            await self.update_message(announcement_id=announcement_id, picture=picture)
+        except Exception as e:
+            logger.error(e)
+            raise e
+
 
     async def add_buttons_to_announcement(self, group_id: int | Mapped[int], message_id: int | Mapped[int]):
         message = await self.get_message(group_id=group_id, message_id=message_id)

@@ -72,8 +72,8 @@ async def show_confirmation_dialogue(message: Message, state: FSMContext):
 
 
 @router.callback_query(Announcement.confirming_announcement,
-                       AdminCallback.filter((F.action == AdminMenuAction.rewrite_announcement) & F.level == 2))
-async def rewrite_announcement(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
+                       AdminCallback.filter((F.action == AdminMenuAction.rewrite_announcement_with_ai) & F.level == 2))
+async def rewrite_announcement_with_ai(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
     original_text = await state.get_value("announcement_text")
     ai_service = AIService()
     rewritten_text = await ai_service.rewrite_announcement(original_text=original_text)

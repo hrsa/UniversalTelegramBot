@@ -78,7 +78,7 @@ async def update_group(session: AsyncSession, group_id: int, new_group_id: int |
 
 
 async def get_active_groups(session: AsyncSession) -> Sequence[Group]:
-    result = await session.execute(select(Group).where(Group.status == "active"))
+    result = await session.execute(select(Group).where(Group.status == "active").where(Group.type != "private"))
     groups = result.scalars().all()
     return groups
 

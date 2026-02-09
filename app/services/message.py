@@ -77,6 +77,7 @@ class MessageService:
             else:
                 await bot.edit_message_text(chat_id=announcement.group_id, message_id=announcement.message_id, text=text)
             await self.update_message(announcement_id=announcement_id, text=text)
+            await self.add_buttons_to_announcement(group_id=announcement.group_id, message_id=announcement.message_id)
         except Exception as e:
             logger.error(e)
             raise e
@@ -89,6 +90,7 @@ class MessageService:
             media = InputMediaPhoto(media=picture, caption=announcement.text)
             await bot.edit_message_media(chat_id=announcement.group_id, message_id=announcement.message_id, media=media)
             await self.update_message(announcement_id=announcement_id, picture=picture)
+            await self.add_buttons_to_announcement(group_id=announcement.group_id, message_id=announcement.message_id)
         except Exception as e:
             logger.error(e)
             raise e

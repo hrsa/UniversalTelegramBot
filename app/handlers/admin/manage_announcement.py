@@ -176,7 +176,7 @@ async def confirm_and_add_button(callback: CallbackQuery, callback_data: AdminCa
     try:
         announcement = await message_service.get_message(announcement_id=announcement_id)
         await button_service.create_button(message_id=announcement.id, button_text=button_name, button_link=button_link)
-        await message_service.add_buttons_to_announcement(message_id=announcement.message_id,
+        await message_service.modify_announcement_buttons(message_id=announcement.message_id,
                                                           group_id=announcement.group_id)
         await show_modify_buttons_dialogue(callback, callback_data, state)
     except Exception as e:
@@ -223,7 +223,7 @@ async def modify_button_name(message: Message, state: FSMContext):
         reply = await bot.send_message(chat_id=message.chat.id, text=title_is_too_long_text)
     else:
         button = await button_service.update_button(button_id=button_id, text=message.text)
-        await message_service.add_buttons_to_announcement(message_id=button.message.message_id,
+        await message_service.modify_announcement_buttons(message_id=button.message.message_id,
                                                           group_id=button.message.group_id)
         await state.set_state(Announcement.managing_announcements)
         keyboard = await build_edit_button_keyboard(button_id=button_id)
@@ -264,7 +264,7 @@ async def modify_button_link(message: Message, state: FSMContext):
         )
     else:
         button = await button_service.update_button(button_id=button_id, link=message.text)
-        await message_service.add_buttons_to_announcement(message_id=button.message.message_id,
+        await message_service.modify_announcement_buttons(message_id=button.message.message_id,
                                                           group_id=button.message.group_id)
         await state.set_state(Announcement.managing_announcements)
         keyboard = await build_edit_button_keyboard(button_id=button_id)
@@ -287,7 +287,7 @@ async def show_delete_button_dialogue(callback: CallbackQuery, callback_data: Ad
                                            no_action=AdminMenuAction.manage_announcements,
                                            group_id=button.message.group_id,
                                            button_id=button.id,
-                                           announcement_id=button.message.id)
+                                           announcement_id=button.message_id)
     await edit_message_safely(message=callback.message, text=text, reply_markup=keyboard)
 
 
@@ -296,7 +296,7 @@ async def show_delete_button_dialogue(callback: CallbackQuery, callback_data: Ad
 async def delete_announcement_button(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
     button = await button_service.get_button(button_id=callback_data.button_id)
     await button_service.delete_button(button_id=callback_data.button_id)
-    await message_service.add_buttons_to_announcement(message_id=button.message.message_id,
+    await message_service.modify_announcement_buttons(message_id=button.message.message_id,
                                                       group_id=button.message.group_id)
     await state.set_state(Announcement.managing_announcements)
     await callback.answer(text="Button deleted!")
@@ -405,7 +405,7 @@ async def confirm_ai_rewrite(callback: CallbackQuery, callback_data: AdminCallba
                        AdminCallback.filter(F.action == AdminMenuAction.confirm_delete_announcement))
 async def delete_announcement(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
     announcement = await message_service.get_message(announcement_id=callback_data.announcement_id)
-    await delete_messages_safely(chat_id=callback_data.group_id, message_ids=[announcement.message_id])
+    await delete_messages_safely(chat_id=announcement.group_id, message_ids=[announcement.message_id])
     await message_service.delete_message(announcement_id=announcement.id)
     success_text = await t_for(key="admin_interactions.manage_announcement.announcement_deleted",
                                user_id=callback.from_user.id)

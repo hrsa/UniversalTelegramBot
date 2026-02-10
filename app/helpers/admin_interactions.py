@@ -32,7 +32,7 @@ async def edit_message_safely(message: MaybeInaccessibleMessageUnion, text: str,
         logger.error(f"Failed to edit message {message.message_id}: {e}")
 
 
-async def delete_messages_safely(chat_id: int, message_ids: Sequence[int] | Sequence[Mapped[int]]):
+async def delete_messages_safely(chat_id: int | Mapped[int], message_ids: Sequence[int] | Sequence[Mapped[int]]):
     for message_id in message_ids:
         try:
             await bot.delete_message(chat_id=chat_id, message_id=message_id)
@@ -305,13 +305,13 @@ async def build_announcement_delete_confirmation(announcement: Message, offset: 
     builder.button(text="⬅️ Back",
                    callback_data=AdminCallback(level=2, action=AdminMenuAction.back,
                                                announcement_offset=offset,
-                                               announcement_id=announcement.message_id,
+                                               announcement_id=announcement.id,
                                                group_id=announcement.group_id).pack())
 
     builder.button(text="Delete 🗑️",
                    callback_data=AdminCallback(level=2, action=AdminMenuAction.confirm_delete_announcement,
                                                announcement_offset=offset,
-                                               announcement_id=announcement.message_id,
+                                               announcement_id=announcement.id,
                                                group_id=announcement.group_id
                                                ).pack())
     builder.adjust(2)

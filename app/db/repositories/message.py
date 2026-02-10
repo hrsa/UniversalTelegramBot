@@ -11,7 +11,7 @@ from app.db.models.message import Message
 
 async def get_message(session: AsyncSession, announcement_id: int | None = None, group_id: int | None = None,
                       message_id: int | None = None) -> Message | None:
-    stmt = select(Message).options(selectinload(Message.buttons))
+    stmt = select(Message).options(selectinload(Message.buttons), selectinload(Message.topic))
     if announcement_id:
         stmt = stmt.where(Message.id == announcement_id)
     elif group_id and message_id:

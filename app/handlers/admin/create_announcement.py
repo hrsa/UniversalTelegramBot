@@ -167,12 +167,8 @@ async def send_announcement(callback: CallbackQuery, state: FSMContext):
     announcement_id = await state.get_value("announcement_id")
     announcement = await message_service.get_message(announcement_id=announcement_id)
 
-    if announcement.picture:
-        result = await bot.send_photo(chat_id=announcement.group_id, message_thread_id=announcement.topic_id,
-                                      photo=announcement.picture, caption=announcement.text)
-    else:
-        result = await bot.send_message(chat_id=announcement.group_id, message_thread_id=announcement.topic_id,
-                                        text=announcement.text)
+    result = await message_service.publish_announcement(announcement_id=announcement.id)
+
     if not result:
         failed_to_send_text = await t_for(key="admin_interactions.create_announcement.failed_to_send_announcement",
                                           user_id=callback.from_user.id)
@@ -277,7 +273,7 @@ async def create_and_publish_announcement_button(callback: CallbackQuery, state:
     try:
         announcement = await message_service.get_message(announcement_id=announcement_id)
         await button_service.create_button(message_id=announcement.id, button_text=button_name, button_link=button_link)
-        await message_service.add_buttons_to_announcement(message_id=announcement.message_id,
+        await message_service.modify_announcement_buttons(message_id=announcement.message_id,
                                                           group_id=announcement.group_id)
     except Exception as e:
         logger.error(e)

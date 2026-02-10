@@ -1,7 +1,5 @@
-from datetime import datetime
-from typing import Sequence, cast
-
-from aiogram.types import message_id, InputMediaPhoto
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.types import InputMediaPhoto
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from loguru import logger
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -11,7 +9,29 @@ from app.bot.core import bot
 from app.db.models.message import Message
 from app.db.repositories import message as message_repo
 from app.db.repositories import message_button as button_repo
-from app.schemas.callbacks import AnnouncementCallback, AnnouncementAction
+from app.db.repositories import group_topic as topic_service
+
+
+async def send_announcement(announcement: Message):
+    try:
+        if announcement.picture:
+            return await bot.send_photo(chat_id=announcement.group_id,
+                                        message_thread_id=announcement.topic_id,
+                                        photo=announcement.picture, caption=announcement.text)
+        return await bot.send_message(chat_id=announcement.group_id,
+                                      message_thread_id=announcement.topic_id,
+                                      text=announcement.text)
+    except Exception as e:
+        raise e
+
+
+async def publish_to_closed_topic(announcement: Message):
+    await bot.reopen_forum_topic(chat_id=announcement.group_id, message_thread_id=announcement.topic_id)
+    try:
+        result = await send_announcement(announcement=announcement)
+    finally:
+        await bot.close_forum_topic(chat_id=announcement.group_id, message_thread_id=announcement.topic_id)
+    return result
 
 
 class MessageService:
@@ -51,7 +71,7 @@ class MessageService:
         if announcement_id is None and group_id is None and message_id is None:
             raise ValueError("At least one of announcement_id, group_id, or message_id must be provided")
         async with self.session() as session:
-            await message_repo.delete_message(session, group_id=group_id, message_id=message_id)
+            await message_repo.delete_message(session, announcement_id=announcement_id, group_id=group_id, message_id=message_id)
 
     async def update_message(self, announcement_id: int | Mapped[int] | None = None, group_id: int | None = None,
                              message_id: int | None = None,
@@ -65,6 +85,22 @@ class MessageService:
                                                      topic_id=topic_id, is_published=is_published, text=text,
                                                      picture=picture, is_pinned=is_pinned)
 
+    async def publish_announcement(self, announcement_id: int | Mapped[int]):
+        announcement = await self.get_message(announcement_id=announcement_id)
+
+        if announcement.topic and announcement.topic.is_closed:
+            return await publish_to_closed_topic(announcement=announcement)
+
+        try:
+            return await send_announcement(announcement=announcement)
+        except TelegramBadRequest as error:
+            if "TOPIC_CLOSED" not in error.message:
+                raise
+            else:
+                async with self.session() as session:
+                    await topic_service.update_topic(session, group_id=announcement.group_id, topic_id=announcement.topic_id, is_closed=True)
+                return await publish_to_closed_topic(announcement=announcement)
+
     async def edit_announcement_text(self, text: str, announcement_id: int | Mapped[int] | None = None):
         announcement = await self.get_message(announcement_id=announcement_id)
         if announcement is None:
@@ -77,7 +113,7 @@ class MessageService:
             else:
                 await bot.edit_message_text(chat_id=announcement.group_id, message_id=announcement.message_id, text=text)
             await self.update_message(announcement_id=announcement_id, text=text)
-            await self.add_buttons_to_announcement(group_id=announcement.group_id, message_id=announcement.message_id)
+            await self.modify_announcement_buttons(group_id=announcement.group_id, message_id=announcement.message_id)
         except Exception as e:
             logger.error(e)
             raise e
@@ -90,13 +126,13 @@ class MessageService:
             media = InputMediaPhoto(media=picture, caption=announcement.text)
             await bot.edit_message_media(chat_id=announcement.group_id, message_id=announcement.message_id, media=media)
             await self.update_message(announcement_id=announcement_id, picture=picture)
-            await self.add_buttons_to_announcement(group_id=announcement.group_id, message_id=announcement.message_id)
+            await self.modify_announcement_buttons(group_id=announcement.group_id, message_id=announcement.message_id)
         except Exception as e:
             logger.error(e)
             raise e
 
 
-    async def add_buttons_to_announcement(self, group_id: int | Mapped[int], message_id: int | Mapped[int]):
+    async def modify_announcement_buttons(self, group_id: int | Mapped[int], message_id: int | Mapped[int]):
         message = await self.get_message(group_id=group_id, message_id=message_id)
         if message is None:
             raise ValueError(f"Message with id {message_id} not found in group {group_id}")

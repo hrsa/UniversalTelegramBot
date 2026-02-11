@@ -63,6 +63,19 @@ async def left_chat_participant_message(message: Message):
         if await group_service.feature_is_active(message.chat.id, "report_leaving_members"):
             await user_service.notify_admins(f"User @{message.left_chat_member.username} left '{group.title}'", group.id)
 
+@router.chat_join_request()
+async def inform_admins_about_join_request(message: Message):
+    group = await group_service.get_group(message.chat.id)
+    if not group:
+        logger.error("Group not found")
+        return
+    name = message.from_user.first_name
+    if message.from_user.last_name:
+        name += " " + message.from_user.last_name
+    if message.from_user.username:
+        name += f" (@{message.from_user.username})"
+    await user_service.notify_admins(group_id=group.id, message=f"<b><u>IMPORTANT</u></b>\n\n{name} has requested to join '{group.title}'")
+
 
 @router.message(F.text.contains("#"), ~StateFilter(AdminPanel))
 async def react_to_greeting(message: Message):

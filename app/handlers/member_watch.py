@@ -2,7 +2,7 @@ from typing import cast
 
 from aiogram import Router, F
 from aiogram.filters import StateFilter
-from aiogram.types import Message, ReactionTypeEmoji
+from aiogram.types import Message, ReactionTypeEmoji, User
 from loguru import logger
 
 from app.bot.core import bot
@@ -25,15 +25,29 @@ gp_service = GroupPermissionService(async_session_maker)
 admin_service = AdminService(async_session_maker, group_service, gp_service)
 
 
+def pretty_print_user(user: User) -> str:
+    result = ""
+    if user.is_bot:
+        result += "<b><u>THIS PERSON IS A BOT!</u></b>\n\n"
+
+    full_name = " ".join(part for part in (user.first_name, user.last_name) if part)
+    if full_name:
+        result += f"{full_name} (@{user.username})"
+    else:
+        result += f"@{user.username}"
+    return result
+
+
 @router.chat_member()
 async def on_chat_member_update(message: Message):
     group_type = cast(GroupType | None, message.chat.type)
     group = await group_service.update_group(group_id=message.chat.id, group_type=group_type,
-                                                    title=message.chat.title,
-                                                    status="active")
+                                             title=message.chat.title,
+                                             status="active")
     member = message.new_chat_member
     member_joined = member.status != "kicked" and member.status != "left"
-    await group_member_service.get_or_create_member(group_id=group.id, group_type=group_type, group_title=message.chat.title,
+    await group_member_service.get_or_create_member(group_id=group.id, group_type=group_type,
+                                                    group_title=message.chat.title,
                                                     user_id=member.user.id,
                                                     first_name=member.user.first_name,
                                                     last_name=member.user.last_name, username=member.user.username,
@@ -48,10 +62,10 @@ async def on_chat_member_update(message: Message):
                 await bot.send_message(message.chat.id, greeting_message)
 
         if await group_service.feature_is_active(group.id, "report_new_members"):
-            await user_service.notify_admins(f"User @{member.user.username} joined '{group.title}'", group.id)
+            await user_service.notify_admins(f"🙂\n\n{pretty_print_user(member.user)} joined '{group.title}'", group.id)
     else:
         if await group_service.feature_is_active(group.id, "report_leaving_members"):
-            await user_service.notify_admins(f"User @{member.user.username} left '{group.title}'", group.id)
+            await user_service.notify_admins(f"😢\n\n{pretty_print_user(member.user)} left '{group.title}'", group.id)
 
 
 @router.message(F.left_chat_participant)
@@ -61,7 +75,9 @@ async def left_chat_participant_message(message: Message):
     else:
         group = await group_service.get_group(message.chat.id)
         if await group_service.feature_is_active(message.chat.id, "report_leaving_members"):
-            await user_service.notify_admins(f"User @{message.left_chat_member.username} left '{group.title}'", group.id)
+            await user_service.notify_admins(f"😢\n\n{pretty_print_user(message.left_chat_member)} left '{group.title}'",
+                                             group.id)
+
 
 @router.chat_join_request()
 async def inform_admins_about_join_request(message: Message):
@@ -69,12 +85,9 @@ async def inform_admins_about_join_request(message: Message):
     if not group:
         logger.error("Group not found")
         return
-    name = message.from_user.first_name
-    if message.from_user.last_name:
-        name += " " + message.from_user.last_name
-    if message.from_user.username:
-        name += f" (@{message.from_user.username})"
-    await user_service.notify_admins(group_id=group.id, message=f"<b><u>IMPORTANT</u></b>\n\n{name} has requested to join '{group.title}'")
+    await user_service.notify_admins(
+        f"❗❗❗\n\n{pretty_print_user(message.from_user)} has requested to join '{group.title}'",
+        group.id)
 
 
 @router.message(F.text.contains("#"), ~StateFilter(AdminPanel))
@@ -95,8 +108,8 @@ async def on_member_status_change(message: Message):
     member = message.new_chat_member
     group_type = cast(GroupType | None, message.chat.type)
     group = await group_service.update_group(group_id=message.chat.id, group_type=group_type,
-                                                    title=message.chat.title,
-                                                    status="active")
+                                             title=message.chat.title,
+                                             status="active")
 
     if (member.status == "administrator") and member.user.id == bot.id:
         await emit_event("get_group_admins", GetGroupAdminsEvent(group_id=group.id))

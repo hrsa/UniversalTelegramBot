@@ -45,7 +45,7 @@ async def on_kick_member_with_no_greeting(event: MemberWithNoGreetingEvent):
         return
 
     await kick_user(event.group_id, event.user_id)
-    await user_service.notify_admins(f"I've kicked @{user.username} from {group.title}.", event.group_id)
+    await user_service.notify_admins(f"I've kicked {user.first_name} {user.last_name} (@{user.username}) from {group.title}.", event.group_id)
     await group_member_service.reset_warning_count(group_id=event.group_id, user_id=event.user_id)
 
 

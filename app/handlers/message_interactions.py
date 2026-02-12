@@ -34,3 +34,15 @@ async def update_group_members_and_group_topics(message: Message):
 
     if message.is_topic_message and message.reply_to_message and message.reply_to_message.forum_topic_created:
         await group_service.get_or_create_topic(group_id=message.chat.id, topic_id=message.message_thread_id, topic_name=message.reply_to_message.forum_topic_created.name)
+
+@router.edited_message(F.text)
+async def find_and_update_text_announcement(message: Message):
+    announcement = await message_service.get_message(group_id=message.chat.id, message_id=message.message_id)
+    if announcement:
+        await message_service.update_message(group_id=message.chat.id, message_id=message.message_id, text=message.text)
+
+@router.edited_message(F.photo)
+async def find_and_update_photo_announcement(message: Message):
+    announcement = await message_service.get_message(group_id=message.chat.id, message_id=message.message_id)
+    if announcement:
+        await message_service.update_message(group_id=message.chat.id, message_id=message.message_id, picture=message.photo[-1].file_id, text=message.caption)

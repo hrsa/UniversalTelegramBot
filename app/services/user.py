@@ -6,13 +6,17 @@ from sqlalchemy.orm import Mapped
 
 from app.db.models.user import User
 from app.db.repositories import user as user_repo
+from aiogram.types import LinkPreviewOptions
+
 from app.bot.core import bot
 
 
-async def notify_user(message: str, user_id: int | None, group_id: int | None = None):
+async def notify_user(message: str, user_id: int | None, group_id: int | None = None,
+                      disable_link_preview: bool = False):
     try:
         await bot.send_message(chat_id=group_id if group_id is not None else user_id,
-                               text=message, parse_mode="HTML")
+                               text=message, parse_mode="HTML",
+                               link_preview_options=LinkPreviewOptions(is_disabled=disable_link_preview))
     except Exception as e:
         logger.error(e)
 
@@ -54,4 +58,4 @@ class UserService:
     async def notify_admins(self, message: str, group_id: int | Mapped[int]):
         admins = await self.get_group_admins(group_id)
         for admin in admins:
-            await notify_user(user_id=admin.id, message=message)
+            await notify_user(user_id=admin.id, message=message, disable_link_preview=True)

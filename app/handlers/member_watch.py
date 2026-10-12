@@ -1,8 +1,9 @@
+import html
 from typing import cast
 
 from aiogram import Router, F
 from aiogram.filters import StateFilter
-from aiogram.types import Message, ReactionTypeEmoji, User
+from aiogram.types import Chat, Message, ReactionTypeEmoji, User
 from loguru import logger
 
 from app.bot.core import bot
@@ -30,12 +31,21 @@ def pretty_print_user(user: User) -> str:
     if user.is_bot:
         result += "<b><u>THIS PERSON IS A BOT!</u></b>\n\n"
 
-    full_name = " ".join(part for part in (user.first_name, user.last_name) if part)
+    full_name = html.escape(" ".join(part for part in (user.first_name, user.last_name) if part))
     if full_name:
         result += f"{full_name} (@{user.username})"
     else:
         result += f"@{user.username}"
     return result
+
+
+def pretty_print_group(chat: Chat) -> str:
+    title = html.escape(chat.title or "")
+    if chat.username:
+        return f'<a href="https://t.me/{chat.username}">{title}</a>'
+    if str(chat.id).startswith("-100"):
+        return f'<a href="https://t.me/c/{str(chat.id).removeprefix("-100")}">{title}</a>'
+    return title
 
 
 @router.chat_member()
@@ -62,10 +72,10 @@ async def on_chat_member_update(message: Message):
                 await bot.send_message(message.chat.id, greeting_message)
 
         if await group_service.feature_is_active(group.id, "report_new_members"):
-            await user_service.notify_admins(f"🙂\n\n{pretty_print_user(member.user)} joined '{group.title}'", group.id)
+            await user_service.notify_admins(f"🙂\n\n{pretty_print_user(member.user)} joined {pretty_print_group(message.chat)}", group.id)
     else:
         if await group_service.feature_is_active(group.id, "report_leaving_members"):
-            await user_service.notify_admins(f"😢\n\n{pretty_print_user(member.user)} left '{group.title}'", group.id)
+            await user_service.notify_admins(f"😢\n\n{pretty_print_user(member.user)} left {pretty_print_group(message.chat)}", group.id)
 
 
 @router.message(F.left_chat_participant)
@@ -75,7 +85,7 @@ async def left_chat_participant_message(message: Message):
     else:
         group = await group_service.get_group(message.chat.id)
         if await group_service.feature_is_active(message.chat.id, "report_leaving_members"):
-            await user_service.notify_admins(f"😢\n\n{pretty_print_user(message.left_chat_member)} left '{group.title}'",
+            await user_service.notify_admins(f"😢\n\n{pretty_print_user(message.left_chat_member)} left {pretty_print_group(message.chat)}",
                                              group.id)
 
 
@@ -86,7 +96,7 @@ async def inform_admins_about_join_request(message: Message):
         logger.error("Group not found")
         return
     await user_service.notify_admins(
-        f"❗❗❗\n\n{pretty_print_user(message.from_user)} has requested to join '{group.title}'",
+        f"❗❗❗\n\n{pretty_print_user(message.from_user)} has requested to join {pretty_print_group(message.chat)}",
         group.id)
 
 

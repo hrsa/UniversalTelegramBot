@@ -1,4 +1,5 @@
 import i18n
+from i18n.translator import LazyTranslationTuple
 from loguru import logger
 
 from app.db.session import async_session_maker
@@ -12,7 +13,7 @@ async def t_for(
         group_id: int | None = None,
         default_locale: str = "en",
         **kwargs
-) -> str:
+) -> str | LazyTranslationTuple:
     async with async_session_maker() as session:
         if user_id is not None:
             locale = await user_repo.get_locale(session, user_id)

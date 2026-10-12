@@ -1,7 +1,9 @@
+from datetime import datetime
 from typing import Sequence
 
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.orm import Mapped
 
 from app.db.models.group_member import GroupMember
 from app.schemas.literals import UserRole, UserStatus, GroupType
@@ -62,6 +64,11 @@ class GroupMemberService:
                 return True
         return False
 
+    async def get_group_members(self, group_id: int | Mapped[int], role: UserRole | None = None, status: UserStatus | None = None) -> Sequence[GroupMember]:
+        async with self.session() as session:
+            return await group_member_repo.get_group_members(session, group_id, role, status)
+
+
     async def get_members_without_greetings(self, group_id: int | None = None) -> Sequence[GroupMember]:
         async with self.session() as session:
             return await group_member_repo.get_members_without_greetings(session, group_id)
@@ -83,3 +90,7 @@ class GroupMemberService:
             group_member = await group_member_repo.get_or_create_group_member(session, group_id, user_id)
             group_features = await self.group_service.get_features(group_id)
             return group_member.warning_count >= group_features.max_warning_count
+
+    async def is_admin(self, user_id: int | Mapped[int]) -> bool:
+        async with self.session() as session:
+            return await group_member_repo.is_admin(session, user_id)

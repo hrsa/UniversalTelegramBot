@@ -2,6 +2,7 @@ from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
+from loguru import logger
 
 from app.bot.core import bot
 from app.config import settings
@@ -11,15 +12,57 @@ from app.helpers.admin_interactions import build_main_features_keyboard, build_g
 from app.schemas.callbacks import AdminCallback, AdminMenuAction
 from app.schemas.states import AdminPanel, GreetingWatch
 from app.services.admin import AdminService
+from app.services.ai import AIService
+from app.services.ai_tools import build_group_tools
 from app.services.group import GroupService
+from app.services.group_member import GroupMemberService
 from app.services.group_permission import GroupPermissionService
 from app.services.s3_backup import S3BackupService
 from app.services.translation import t_for
+from app.services.user import UserService
 
 router = Router()
 group_permission_service = GroupPermissionService(async_session_maker)
 group_service = GroupService(async_session_maker)
+user_service = UserService(async_session_maker)
+group_member_service = GroupMemberService(async_session_maker, group_service, user_service)
 admin_service = AdminService(async_session_maker, group_service, group_permission_service)
+ai_service = AIService()
+
+
+@router.message(Command("ask"))
+async def answer_with_tools(message: Message, state: FSMContext):
+    user_message = message.text
+    if message.from_user is None:
+        logger.error(f"Message {message} has no 'from_user'")
+        return
+
+    if not await group_member_service.is_admin(message.from_user.id):
+        await message.answer(f"You can't ask me anything because you are not an administrator.")
+        return
+
+    tools = build_group_tools(current_user_id=message.from_user.id, group_service=group_service,
+                              user_service=user_service, admin_service=admin_service,
+                              group_member_service=group_member_service)
+
+    if user_message is not None:
+        try:
+            answer = await ai_service.chat_with_tools(
+                user_message=user_message[4:],
+                tools=tools,
+                system_prompt=("You are a Telegram bot assistant. "
+                               "You may use tools to read group and group member data. "
+                               "Only use the tools for read-only lookups. "
+                               "Do not invent database values. "
+                               "Keep formatting compatible with Telegram HTML parse_mode (<b>, <i>, <u>, <s>, <a>, <code>, <pre>, <tg-spoiler>, etc.), and never break HTML tags."
+                               "If data is missing, say that it was not found."),
+                max_tool_rounds=5
+            )
+        except Exception as e:
+            logger.error(e)
+            answer = f"I got an error! {e}"
+
+        await message.answer(answer)
 
 
 @router.message(Command("manage"))
@@ -88,7 +131,7 @@ async def force_backup(message: Message, state: FSMContext):
         else:
             text = await t_for(key="admin_interactions.backups.run.no_backups",
                                user_id=message.from_user.id)
-            await bot.send_message(message.chat.id, "No backup files found.")
+            await bot.send_message(message.chat.id, text)
     except Exception as e:
         text = await t_for(key="admin_interactions.backups.run.error",
                            user_id=message.from_user.id,
@@ -101,6 +144,7 @@ async def process_group_selection(callback: CallbackQuery, callback_data: AdminC
     group_id = callback_data.group_id
     if not group_id:
         group_id = await state.get_value("group_id")
+
     group = await group_service.get_or_create_group(group_id)
     features = await group_service.get_features(group_id)
     keyboard = await build_main_features_keyboard(group_id, features)
@@ -117,6 +161,12 @@ async def process_group_selection(callback: CallbackQuery, callback_data: AdminC
 async def toggle_feature(callback: CallbackQuery, callback_data: AdminCallback, state: FSMContext):
     feature_name = callback_data.feature_name.name
     group_id = callback_data.group_id
+    if not group_id:
+        logger.error(f"Group id {group_id} not found.")
+        return
+    if not callback.message:
+        logger.error(f"Message {callback.message} not found.")
+        return
     group = await group_service.get_or_create_group(group_id)
     try:
         await admin_service.toggle_feature(group_id, feature_name)

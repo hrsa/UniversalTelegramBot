@@ -37,10 +37,12 @@ class Settings(BaseSettings):
     BACKUP_DIR: str
 
     AI_PROVIDER: str = "openai"
-    AI_MODEL: str = "gpt-4.1-mini"
+    AI_MODEL: str = "gpt-5.2"
     AI_TEMPERATURE: float = 0.3
     AI_MAX_TOKENS: int = 512
     OPENAI_API_KEY: str | None = None
+    ANTHROPIC_API_KEY: str | None = None
+    GROQ_API_KEY: str | None = None
     OLLAMA_URL: str | None = None
 
 settings = Settings()

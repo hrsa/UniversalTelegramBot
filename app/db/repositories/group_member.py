@@ -1,11 +1,16 @@
+from datetime import datetime
 from typing import Sequence
 
+from certifi import where
+from sqlalchemy import exists
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import Mapped, selectinload
 from sqlalchemy.sql.functions import func
 
 from app.db.models.group import Group
 from app.db.models.group_member import GroupMember
+from app.db.models.user import User
 from app.schemas.literals import UserRole, UserStatus
 
 
@@ -55,6 +60,18 @@ async def get_or_create_group_member(
     return group_member
 
 
+async def is_admin(session: AsyncSession, user_id: int | Mapped[int]) -> bool:
+    stmt = select(
+        exists().where(
+            GroupMember.user_id == user_id,
+            GroupMember.status == "active",
+            GroupMember.role.in_(["administrator", "creator"]),
+        )
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one()
+
+
 async def set_member_status(session: AsyncSession, group_id: int, user_id: int, status: UserStatus) -> GroupMember:
     group_member = await get_or_create_group_member(session, group_id, user_id)
     group_member.status = status
@@ -74,6 +91,27 @@ async def set_member_greeting_message(session: AsyncSession, group_id: int, user
     await session.refresh(group_member)
     return group_member
 
+
+async def get_group_members(
+        session: AsyncSession, group_id: int | Mapped[int], role: UserRole | None = None,
+        status: UserStatus | None = None
+) -> Sequence[GroupMember]:
+    stmt = (select(GroupMember)
+            .options(selectinload(GroupMember.user))
+            .where(GroupMember.group_id == group_id)
+            )
+
+    if role is not None:
+        stmt = stmt.where(GroupMember.role == role)
+
+    if status is not None:
+        stmt = stmt.where(GroupMember.status == status)
+
+    result = await session.execute(stmt)
+    group_members = result.scalars().all()
+    return group_members
+
+
 async def get_members_without_greetings(session: AsyncSession, group_id: int | None = None) -> Sequence[GroupMember]:
     stmt = select(GroupMember).join(Group, Group.id == GroupMember.group_id)
     stmt = stmt.where(GroupMember.greeting_message.is_(None))
@@ -91,6 +129,7 @@ async def get_members_without_greetings(session: AsyncSession, group_id: int | N
     result = await session.execute(stmt)
     group_members = result.scalars().all()
     return group_members
+
 
 async def increase_warning_count(session: AsyncSession, group_id: int, user_id: int) -> GroupMember:
     group_member = await get_or_create_group_member(session, group_id, user_id)

@@ -49,12 +49,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan, title="aUniversalTelegramBot")
 for router in api_routers:
     app.include_router(router)
-for listener in all_listeners:
-    app.include_router(listener)
+# for listener in all_listeners:
+#     app.include_router(listener)
 
 logger.add(sys.stdout, format="<green>{time}</green> <level>{message}</level>", level="INFO", colorize=True)
 if settings.ENV == "production":
-    logger.add("logs/bot.log", rotation="3 days", retention="12 days", colorize=True,
+    logger.add("logs/bot.log", rotation="3 days", retention="90 days", colorize=True, level="INFO",
                format="<green>{time}</green> <level>{message}</level>")
 
 

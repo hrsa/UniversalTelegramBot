@@ -1,7 +1,7 @@
 from typing import Sequence
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, Mapped
 
 from app.db.models.group import Group
 from app.db.models.group_topic import GroupTopic
@@ -10,7 +10,7 @@ from app.schemas.literals import GroupStatus, GroupType
 
 async def get_or_create_group(
         session: AsyncSession,
-        group_id: int,
+        group_id: int | Mapped[int],
         group_type: GroupType | None = None,
         title: str | None = None,
         status: str | None = None,
@@ -22,17 +22,17 @@ async def get_or_create_group(
     return group
 
 
-async def get_group(session: AsyncSession, group_id: int) -> Group | None:
+async def get_group(session: AsyncSession, group_id: int | Mapped[int]) -> Group | None:
     result = await session.execute(select(Group).options(selectinload(Group.topics)).where(Group.id == group_id))
     return result.scalar_one_or_none()
 
 
-async def get_group_topics(session: AsyncSession, group_id: int) -> Sequence[GroupTopic] | None:
+async def get_group_topics(session: AsyncSession, group_id: int | Mapped[int]) -> Sequence[GroupTopic] | None:
     result = await session.execute(select(GroupTopic).where(GroupTopic.group_id == group_id))
     return result.scalars().all()
 
 
-async def delete_group(session: AsyncSession, group_id: int) -> None:
+async def delete_group(session: AsyncSession, group_id: int | Mapped[int]) -> None:
     stmt = select(Group).where(Group.id == group_id)
     result = await session.execute(stmt)
     group = result.scalar_one_or_none()
@@ -41,7 +41,7 @@ async def delete_group(session: AsyncSession, group_id: int) -> None:
         await session.commit()
 
 
-async def create_group(session: AsyncSession, group_id: int, group_type: GroupType | None = None,
+async def create_group(session: AsyncSession, group_id: int | Mapped[int], group_type: GroupType | None = None,
                        title: str | None = None, locale: str | None = None,
                        status: str | None = None, ) -> Group:
     group = await get_group(session=session, group_id=group_id)
@@ -60,7 +60,7 @@ async def create_group(session: AsyncSession, group_id: int, group_type: GroupTy
     return group
 
 
-async def update_group(session: AsyncSession, group_id: int, new_group_id: int | None = None, title: str | None = None,
+async def update_group(session: AsyncSession, group_id: int | Mapped[int], new_group_id: int | None = None, title: str | None = None,
                        group_type: GroupType | None = None, status: GroupStatus | None = None,
                        greeting_hashtag: str | None = None,
                        greeting_message: str | None = None, reminder_message: str | None = None) -> Group:
@@ -83,7 +83,7 @@ async def get_active_groups(session: AsyncSession) -> Sequence[Group]:
     return groups
 
 
-async def set_group_status(session: AsyncSession, group_id: int, status: GroupStatus) -> Group:
+async def set_group_status(session: AsyncSession, group_id: int | Mapped[int], status: GroupStatus) -> Group:
     group = await get_or_create_group(session, group_id)
     group.status = status
     await session.commit()
@@ -91,7 +91,7 @@ async def set_group_status(session: AsyncSession, group_id: int, status: GroupSt
     return group
 
 
-async def set_group_features(session: AsyncSession, group_id: int, features: dict) -> Group:
+async def set_group_features(session: AsyncSession, group_id: int | Mapped[int], features: dict) -> Group:
     group = await get_or_create_group(session, group_id)
     group.features = features
     await session.commit()

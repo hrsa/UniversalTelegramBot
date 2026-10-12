@@ -7,14 +7,16 @@ from app.events.schemas import GetGroupAdminsEvent
 from app.services.group import GroupService
 from app.services.group_member import GroupMemberService
 from app.services.user import UserService
+from app.events.emitter import redis_broker
 
-broker = RedisRouter(f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}")
+#broker = RedisRouter(url=f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}")
 group_service = GroupService(async_session_maker)
 user_service = UserService(async_session_maker)
 group_member_service = GroupMemberService(async_session_maker, group_service, user_service)
 
 
-@broker.subscriber("events.get_group_admins")
+#@broker.subscriber("events.get_group_admins")
+@redis_broker.subscriber("events.get_group_admins")
 async def on_get_group_admins(event: GetGroupAdminsEvent):
     admins = await bot.get_chat_administrators(event.group_id)
     for admin in admins:

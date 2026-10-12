@@ -44,7 +44,7 @@ class GroupService:
         async with self.session() as session:
             return await group_repo.create_group(session, group_id, group_type, title, status)
 
-    async def get_topics(self, group_id: int) -> Sequence[GroupTopic]:
+    async def get_topics(self, group_id: int) -> Sequence[GroupTopic] | None:
         async with self.session() as session:
             return await group_repo.get_group_topics(session, group_id)
 

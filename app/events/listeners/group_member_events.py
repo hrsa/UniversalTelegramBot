@@ -9,16 +9,18 @@ from app.services.group import GroupService
 from app.services.group_member import GroupMemberService
 from app.services.group_permission import GroupPermissionService
 from app.services.user import UserService, kick_user, notify_user
+from app.events.emitter import redis_broker
 
 group_service = GroupService(async_session_maker)
 user_service = UserService(async_session_maker)
 group_permission_service = GroupPermissionService(async_session_maker)
 group_member_service = GroupMemberService(async_session_maker, group_service, user_service)
 
-broker = RedisRouter(f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}")
+#broker = RedisRouter(f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}")
 
 
-@broker.subscriber("events.member_with_no_greeting.kick")
+#@broker.subscriber("events.member_with_no_greeting.kick")
+@redis_broker.subscriber("events.member_with_no_greeting.kick")
 async def on_kick_member_with_no_greeting(event: MemberWithNoGreetingEvent):
     kick_inactive_members = await group_service.feature_is_active(event.group_id, "kick_inactive_members")
     can_kick_members = await group_permission_service.check_permission(event.group_id, "can_restrict_members")
@@ -49,7 +51,8 @@ async def on_kick_member_with_no_greeting(event: MemberWithNoGreetingEvent):
     await group_member_service.reset_warning_count(group_id=event.group_id, user_id=event.user_id)
 
 
-@broker.subscriber("events.member_with_no_greeting.notify")
+#@broker.subscriber("events.member_with_no_greeting.notify")
+@redis_broker.subscriber("events.member_with_no_greeting.notify")
 async def on_notify_member_with_no_greeting(event: MemberWithNoGreetingEvent):
     user = await user_service.get_or_create_user(event.user_id)
     greeting_message = await group_service.get_greeting_message(event.group_id, user.username)

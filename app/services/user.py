@@ -1,7 +1,10 @@
+from typing import Sequence
+
 from loguru import logger
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import Mapped
 
+from app.db.models.user import User
 from app.db.repositories import user as user_repo
 from app.bot.core import bot
 
@@ -33,6 +36,10 @@ class UserService:
                                                       last_name=last_name, username=username, is_bot=is_bot, user_locale=locale)
         return user
 
+    async def get_user(self, user_id: int):
+        async with self.session() as session:
+            return await user_repo.get_user(session, user_id=user_id)
+
     async def update_user(self, user_id: int, first_name: str | None = None, last_name: str | None = None,
                       username: str | None = None, email: str | None = None, user_locale: str | None = None, is_bot: bool | None = None):
         async with self.session() as session:
@@ -40,7 +47,7 @@ class UserService:
                       username=username, email=email, user_locale=user_locale, is_bot=is_bot)
             return user
 
-    async def get_group_admins(self, group_id: int | Mapped[int]):
+    async def get_group_admins(self, group_id: int | Mapped[int]) -> Sequence[User]:
         async with self.session() as session:
             return await user_repo.get_group_admins(session, group_id)
 

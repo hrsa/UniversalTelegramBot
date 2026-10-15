@@ -25,7 +25,7 @@ class AdminService:
         async with self.session() as session:
             groups = await group_repo.get_groups_managed_by_user(session, user_id)
 
-        return groups
+        return sorted(groups, key=lambda group: (group.title or "").casefold())
 
     async def find_users(self, admin_user_id: int, user_id: int | Mapped[int] | None = None,
                          first_name: str | Mapped[str] | None = None, last_name: str | Mapped[str] | None = None,
